@@ -17,23 +17,23 @@ export class PlayerMotor extends Component {
     @property({ type: Node, tooltip: 'Visual child to flip without scaling the physics root.' })
     public visualRoot: Node | null = null;
 
-    @property({ tooltip: 'Maximum horizontal speed in pixels per second.' })
-    public maxMoveSpeed = 260;
+    @property({ tooltip: 'Maximum horizontal speed in physics world units per second.' })
+    public maxMoveSpeed = 5;
 
-    @property({ tooltip: 'Ground acceleration in pixels per second squared.' })
-    public groundAcceleration = 1800;
+    @property({ tooltip: 'Ground acceleration in physics world units per second squared.' })
+    public groundAcceleration = 35;
 
-    @property({ tooltip: 'Air acceleration in pixels per second squared.' })
-    public airAcceleration = 900;
+    @property({ tooltip: 'Air acceleration in physics world units per second squared.' })
+    public airAcceleration = 12;
 
-    @property({ tooltip: 'Horizontal deceleration in pixels per second squared.' })
-    public deceleration = 2200;
+    @property({ tooltip: 'Horizontal deceleration in physics world units per second squared.' })
+    public deceleration = 45;
 
-    @property({ tooltip: 'Upward speed applied by a grounded jump.' })
-    public jumpSpeed = 620;
+    @property({ tooltip: 'Upward speed applied by a grounded jump, in physics world units per second.' })
+    public jumpSpeed = 15;
 
     @property({ tooltip: 'Gravity multiplier used by RigidBody2D.' })
-    public gravityScale = 2;
+    public gravityScale = 3;
 
     private body: RigidBody2D | null = null;
     private facingSign = 1;
