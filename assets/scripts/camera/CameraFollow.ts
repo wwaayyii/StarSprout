@@ -20,6 +20,9 @@ export class CameraFollow extends Component {
     @property({ tooltip: 'Maximum camera X position in world space.' })
     public maxX = 10000;
 
+    @property({ tooltip: 'Immediately align the camera with the target when the scene starts.' })
+    public snapOnStart = true;
+
     private initialWorldY = 0;
     private initialWorldZ = 0;
 
@@ -27,6 +30,28 @@ export class CameraFollow extends Component {
         const worldPosition = this.node.worldPosition;
         this.initialWorldY = worldPosition.y;
         this.initialWorldZ = worldPosition.z;
+    }
+
+    protected start(): void {
+        if (this.snapOnStart) {
+            this.snapToTarget();
+        }
+    }
+
+    public snapToTarget(): void {
+        if (!this.target) {
+            return;
+        }
+
+        const lowerBound = Math.min(this.minX, this.maxX);
+        const upperBound = Math.max(this.minX, this.maxX);
+        const targetX = this.clamp(
+            this.target.worldPosition.x + this.horizontalOffset,
+            lowerBound,
+            upperBound,
+        );
+
+        this.node.setWorldPosition(targetX, this.initialWorldY, this.initialWorldZ);
     }
 
     protected lateUpdate(deltaTime: number): void {
