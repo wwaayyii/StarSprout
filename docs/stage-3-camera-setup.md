@@ -29,6 +29,7 @@
 5. 保持 Camera 的 Y 坐标处于所需取景高度；组件启用时会记录该世界坐标 Y，运行期间只改变 X。
 6. 根据构图设置 **Horizontal Offset**。正值让摄像机中心位于 Player 右侧，负值位于左侧。
 7. 将 **Smooth Time** 先设为 `0.2` 秒，再根据实际手感微调。值越小跟随越紧，设为 `0` 时立即跟随。
+8. **Snap On Start** 默认勾选。它会在进入场景时立即将 Camera 对准 Player 的目标 X，避免摄像机从编辑器保存的旧位置平滑追赶玩家；角色传送、复活或切换检查点后，也可以主动调用 `CameraFollow.snapToTarget()` 立即重新对准。
 
 ## 4. 设置摄像机边界
 
@@ -67,7 +68,7 @@ Canvas
 ## 6. 运行验证
 
 1. 从现有的 Boot → Start → TestLevel 流程进入测试关卡。
-2. 左右移动 Player，确认摄像机只在 X 轴平滑跟随，Y 高度不随跳跃改变。
+2. 保持 **Snap On Start** 勾选，确认进入 TestLevel 时 Camera 立即对准 Player，不会从旧位置平滑追赶；随后左右移动 Player，确认摄像机只在 X 轴平滑跟随，Y 高度不随跳跃改变。
 3. 在多个平台间跳跃，确认画面没有因物理更新顺序产生明显抖动。
 4. 分别走到关卡左右两端，确认 Camera X 不会越过 `Min X` 或 `Max X`。
 5. 左右移动 Player 时，确认 `Label` 和 `BackButton` 始终固定在屏幕中的原有位置，不随关卡画面滚动。
