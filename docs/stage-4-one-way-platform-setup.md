@@ -2,6 +2,12 @@
 
 本阶段使用 `OneWayPlatform` 的 `PRE_SOLVE` 接触回调，让玩家向上跳时穿过平台，并在从平台上方向下落时恢复实体碰撞。该规则只作用于 `PlayerMotor` 节点层级内、使用 Dynamic `RigidBody2D` 的碰撞体；其他物体仍把平台视为普通实体。
 
+## 玩家刚体配置
+
+配置平台组件前，先在层级管理器中选择 `World/Player`，然后在 Player 的 `RigidBody2D` 组件中勾选 **Enabled Contact Listener**。
+
+这是 Box2D 为该刚体生成 `PRE_SOLVE` 接触回调的必要条件。如果没有启用接触监听，`OneWayPlatform` 不会收到回调，也就无法在玩家向上穿越平台时禁用当帧接触。
+
 ## 给测试平台添加组件
 
 在 Cocos Creator 3.8.8 中打开 `TestLevel`，依次对 `Platform01`、`Platform02`、`Platform03` 执行以下操作：
@@ -24,6 +30,15 @@
 3. **站立稳定**：在平台中央静止数秒，确认没有下沉、弹跳或反复穿透。
 4. **边缘稳定性**：缓慢走到平台左右边缘、停留并走回，再从边缘附近跳起和落下；确认没有明显抖动或被侧边卡住。若只在临界位置出现物理误差，逐步微调 **Surface Tolerance**，每次调整后重新测试全部三项行为。
 5. **普通实体**：用不属于 `PlayerMotor` 层级的动态物体碰撞平台，确认它仍与完整的 `BoxCollider2D` 正常碰撞。
+
+## 故障排查
+
+如果玩家仍然撞到平台底部，请依次检查：
+
+1. 首先选择 `World/Player`，确认其 `RigidBody2D` 已勾选 **Enabled Contact Listener**。
+2. 确认项目当前使用的 2D 物理系统为 **Box2D**。
+3. 确认平台 `BoxCollider2D` 的 **Sensor** 已关闭。
+4. 确认 `OneWayPlatform` 与平台的 `BoxCollider2D` 位于同一个节点上。
 
 ## 当前范围
 
