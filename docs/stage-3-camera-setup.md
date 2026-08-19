@@ -43,10 +43,32 @@
 
 这样摄像机到达两端时不会拍到关卡外区域。若关卡宽度小于一个完整视口，可将 `Min X` 与 `Max X` 设为同一个关卡中心值。即使误把 `Min X` 配得大于 `Max X`，组件也会安全地按较小值和较大值计算有效范围，但仍建议在 Inspector 中保持语义正确。
 
-## 5. 运行验证
+## 5. 固定屏幕 UI
+
+`CameraFollow` 会移动 `Camera` 节点。如果 `Label` 和 `BackButton` 仍然直接放在 `Canvas` 下，它们不会跟随 Camera 移动，因而会在关卡摄像机滚动时偏离原有的屏幕相对位置。第一阶段的灰盒验证暂时采用以下节点结构：
+
+```text
+Canvas
+├─ Camera
+│  └─ HUD
+│     ├─ Label
+│     └─ BackButton
+└─ World
+   ├─ Ground
+   └─ Player
+```
+
+1. 在 `Camera` 节点下创建名为 `HUD` 的空节点。
+2. 将 `Label` 和 `BackButton` 移到 `HUD` 下。它们会随 Camera 一起移动，从而保持屏幕相对位置固定。
+3. 更换父节点可能改变节点的本地坐标效果；移动后必须在编辑器中重新检查并调整 `Label` 和 `BackButton` 的本地位置。
+4. `World`、`Ground` 和 `Player` 属于关卡世界，不得放入 `Camera` 或 `HUD` 下。
+5. 后续正式 UI 系统可以改为独立的 UI Camera 和专用图层；当前灰盒阶段不增加第二台 Camera。
+
+## 6. 运行验证
 
 1. 从现有的 Boot → Start → TestLevel 流程进入测试关卡。
 2. 左右移动 Player，确认摄像机只在 X 轴平滑跟随，Y 高度不随跳跃改变。
 3. 在多个平台间跳跃，确认画面没有因物理更新顺序产生明显抖动。
 4. 分别走到关卡左右两端，确认 Camera X 不会越过 `Min X` 或 `Max X`。
-5. 临时清空 `Target` 后运行，确认组件安全等待绑定且控制台不报错；验证后重新绑定 Player。
+5. 左右移动 Player 时，确认 `Label` 和 `BackButton` 始终固定在屏幕中的原有位置，不随关卡画面滚动。
+6. 临时清空 `Target` 后运行，确认组件安全等待绑定且控制台不报错；验证后重新绑定 Player。
