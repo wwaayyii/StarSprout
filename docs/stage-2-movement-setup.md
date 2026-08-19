@@ -35,7 +35,7 @@
 - `Linear Damping`: `0`
 - `Angular Damping`: `0`
 - `Fixed Rotation`: **开启**，避免角色碰撞后翻倒
-- `Enabled Contact Listener`: **开启**，确保脚底 Sensor 能收到接触事件
+- `Enabled Contact Listener`: 本实现不依赖接触回调，可保持关闭
 - `Bullet`: 关闭即可
 
 ### BoxCollider2D
@@ -50,18 +50,17 @@
 
 主体 BoxCollider2D 用于实际阻挡；不要把它设为 Sensor。
 
-## 4. 创建脚底 GroundSensor
+## 4. 创建脚底 GroundProbe
 
-1. 在 `Player` 下创建空子节点，命名为 `GroundSensor`。
-2. 将其位置设在脚底略下方，例如 `(0, -42, 0)`。
-3. 给该节点添加 `BoxCollider2D`：
-   - `Size`: 推荐 `36 × 8`，宽度略窄于主体；
-   - `Offset`: `(0, 0)`；
-   - `Sensor`: **开启**；
-   - `Group`/`Mask`: 必须允许检测 Ground 的碰撞分组。
-4. 给同一节点添加 `GroundSensor` 脚本组件。
+1. 在 `Player` 下创建空子节点，命名为 `GroundProbe`。
+2. 将其放在主体碰撞器脚底附近，例如 `(0, -41, 0)`。探测射线从该节点的世界坐标开始向下发射。
+3. **不要**给 GroundProbe 添加 `BoxCollider2D`、`RigidBody2D` 或任何 Sensor；它只是射线起点。
+4. 只给 GroundProbe 添加 `GroundSensor` 脚本组件，并设置：
+   - `Ground Mask`: 只勾选地面/平台使用的碰撞分组；默认 `0xffffffff` 会检测所有分组，搭建完成后推荐收窄；
+   - `Ray Distance`: 推荐 `10` 像素，足以越过脚底与地面的微小间隙，但不应长到隔空着地；
+   - `Probe Half Width`: 推荐 `16` 像素，应略小于主体碰撞器半宽。
 
-Sensor 与玩家主体属于同一个父级 RigidBody2D，不要在 GroundSensor 子节点上再添加 RigidBody2D。脚本用集合记录接触到的地面碰撞器，因此跨越两块地面时，即使先离开其中一块，也会在离开全部地面后才变为空中。
+GroundSensor 会从 GroundProbe 的左、中、右三个位置向下发射短射线。它会忽略 Sensor 类型碰撞器，并排除 Player 根节点及其全部子节点上的碰撞器，所以不依赖接触回调、`Enabled Contact Listener` 或同时接触计数。
 
 ## 5. 创建 Ground
 
@@ -76,26 +75,27 @@ Sensor 与玩家主体属于同一个父级 RigidBody2D，不要在 GroundSensor
    - `Sensor`: **关闭**；
    - `Friction`: 推荐 `0`；
    - `Restitution`: `0`；
-   - `Group`/`Mask`: 与 Player 主体及 GroundSensor 相互匹配。
+   - `Group`/`Mask`: 与 Player 主体相互匹配，并包含在 GroundSensor 的 `Ground Mask` 中。
 4. Ground 可以只使用 BoxCollider2D（会作为静态碰撞体），也可添加 `RigidBody2D` 并明确设置 `Type = Static`。不要设置成 Dynamic。
 
-需要多个平台时，可以复制 Ground；GroundSensor 会正确处理同时接触多个平台的情况。
+需要多个平台时，可以复制 Ground；三条射线可提高 Player 站在平台边缘时的着地稳定性。
 
 ## 6. 挂载和关联三个脚本
 
 | 脚本 | 挂载节点 | 配置 |
 | --- | --- | --- |
 | `KeyboardInput.ts` | `Player` | 无需额外引用 |
-| `PlayerMotor.ts` | `Player` | 关联 KeyboardInput 与脚底 GroundSensor |
-| `GroundSensor.ts` | `Player/GroundSensor` | 与 Sensor BoxCollider2D 放在同一节点 |
+| `PlayerMotor.ts` | `Player` | 关联 KeyboardInput、GroundSensor 与显示节点 |
+| `GroundSensor.ts` | `Player/GroundProbe` | 只作为射线探测脚本，不需要物理组件 |
 
 具体操作：
 
 1. 在 Player 上添加 `KeyboardInput` 组件。
 2. 在 Player 上添加 `PlayerMotor` 组件。
 3. 将 Player 自身的 KeyboardInput 组件拖到 PlayerMotor 的 `Keyboard Input` 属性。
-4. 将 `Player/GroundSensor` 节点上的 GroundSensor 组件拖到 PlayerMotor 的 `Ground Sensor` 属性。
-5. 推荐的 PlayerMotor 初始参数：
+4. 将 `Player/GroundProbe` 节点上的 GroundSensor 组件拖到 PlayerMotor 的 `Ground Sensor` 属性。
+5. 将 `Player/BodyVisual` 节点拖到 PlayerMotor 的 `Visual Root` 属性。PlayerMotor 只会翻转该显示节点，不会缩放带 RigidBody2D 的 Player 根节点；若留空，则不会执行朝向翻转。
+6. 推荐的 PlayerMotor 初始参数：
    - `Max Move Speed`: `260`
    - `Ground Acceleration`: `1800`
    - `Air Acceleration`: `900`
@@ -115,8 +115,9 @@ Sensor 与玩家主体属于同一个父级 RigidBody2D，不要在 GroundSensor
 6. 松开移动键：玩家按 `Deceleration` 平滑减速。
 7. 玩家着地时按一次 `Space`：玩家跳跃；在空中反复按 Space 不应再次起跳。
 8. 长按 Space：只触发一次跳跃；松开再按后，必须等玩家重新着地才能再次跳跃。
-9. 让脚底同时跨在两块 Ground 上，再离开其中一块：玩家仍应保持着地，离开全部地面后才为空中。
-10. 按返回按钮：应仍能回到 Start 场景。
-11. 在按住移动键时切换浏览器标签页或让预览失焦，再返回：输入应已清空，不应出现“粘键”。
+9. 让 Player 逐渐移动到平台边缘：左、中、右射线中只要一条仍击中地面，玩家就应保持着地；全部射线离开平台后进入空中。
+10. 在编辑器的 **项目 → 项目设置 → 物理 → 2D 物理** 中临时开启 Physics2D 的 **Debug Draw/调试绘制**，运行预览并确认 Player 与 Ground 的碰撞器边界和 GroundProbe 位置正确。调试绘制用于核对碰撞器，射线本身不会自动显示；验证完成后可关闭该选项，且本次提交不会改动 settings 文件。
+11. 按返回按钮：应仍能回到 Start 场景。
+12. 在按住移动键时切换浏览器标签页或让预览失焦，再返回：输入应已清空，不应出现“粘键”。
 
-如果角色穿地，优先检查 Collider 的 Group/Mask、Ground 是否为静态碰撞体，以及 Player 的 RigidBody2D 是否为 Dynamic。如果不能跳跃，检查脚底 BoxCollider2D 是否开启 Sensor、`Enabled Contact Listener` 是否开启，以及 PlayerMotor 的 Ground Sensor 引用是否正确。
+如果角色穿地，优先检查 Collider 的 Group/Mask、Ground 是否为静态碰撞体，以及 Player 的 RigidBody2D 是否为 Dynamic。如果不能跳跃，检查 GroundProbe 是否位于脚底、`Ground Mask` 是否包含地面分组、`Ray Distance` 是否足够，以及 PlayerMotor 的 Ground Sensor 引用是否正确。

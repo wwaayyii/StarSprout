@@ -1,53 +1,69 @@
-import { _decorator, Collider2D, Component, Contact2DType, IPhysics2DContact } from 'cc';
+import {
+    _decorator,
+    Collider2D,
+    Component,
+    ERaycast2DType,
+    Node,
+    PhysicsSystem2D,
+    Vec2,
+} from 'cc';
 
-const { ccclass, requireComponent } = _decorator;
+const { ccclass, property } = _decorator;
 
-/** Tracks every collider currently overlapping the player's foot sensor. */
+/** Detects ground below this probe with three short downward raycasts. */
 @ccclass('GroundSensor')
-@requireComponent(Collider2D)
 export class GroundSensor extends Component {
-    private readonly groundContacts = new Set<Collider2D>();
-    private sensor: Collider2D | null = null;
+    @property({ tooltip: 'Collision mask used by the ground raycasts.' })
+    public groundMask = 0xffffffff;
 
+    @property({ min: 0, tooltip: 'Downward ray length in pixels.' })
+    public rayDistance = 10;
+
+    @property({ min: 0, tooltip: 'Horizontal offset of the left and right rays in pixels.' })
+    public probeHalfWidth = 16;
+
+    /** Performs a current physics query instead of relying on contact callbacks. */
     public get isGrounded(): boolean {
-        return this.groundContacts.size > 0;
+        const origin = this.node.worldPosition;
+        const offsets = [-this.probeHalfWidth, 0, this.probeHalfWidth];
+
+        for (const offset of offsets) {
+            const start = new Vec2(origin.x + offset, origin.y);
+            const end = new Vec2(start.x, start.y - this.rayDistance);
+            const results = PhysicsSystem2D.instance.raycast(
+                start,
+                end,
+                ERaycast2DType.All,
+                this.groundMask,
+            );
+
+            if (results.some((result) => this.isValidGround(result.collider))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
-    protected onEnable(): void {
-        this.sensor = this.getComponent(Collider2D);
-        this.sensor?.on(Contact2DType.BEGIN_CONTACT, this.onBeginContact, this);
-        this.sensor?.on(Contact2DType.END_CONTACT, this.onEndContact, this);
+    private isValidGround(collider: Collider2D): boolean {
+        if (collider.sensor) {
+            return false;
+        }
+
+        const playerRoot = this.node.parent ?? this.node;
+        return !this.isNodeInPlayerHierarchy(collider.node, playerRoot);
     }
 
-    protected onDisable(): void {
-        this.removeListeners();
-        this.groundContacts.clear();
-    }
+    private isNodeInPlayerHierarchy(node: Node, playerRoot: Node): boolean {
+        let current: Node | null = node;
 
-    protected onDestroy(): void {
-        this.removeListeners();
-        this.groundContacts.clear();
-    }
+        while (current) {
+            if (current === playerRoot) {
+                return true;
+            }
+            current = current.parent;
+        }
 
-    private onBeginContact(
-        _selfCollider: Collider2D,
-        otherCollider: Collider2D,
-        _contact: IPhysics2DContact | null,
-    ): void {
-        this.groundContacts.add(otherCollider);
-    }
-
-    private onEndContact(
-        _selfCollider: Collider2D,
-        otherCollider: Collider2D,
-        _contact: IPhysics2DContact | null,
-    ): void {
-        this.groundContacts.delete(otherCollider);
-    }
-
-    private removeListeners(): void {
-        this.sensor?.off(Contact2DType.BEGIN_CONTACT, this.onBeginContact, this);
-        this.sensor?.off(Contact2DType.END_CONTACT, this.onEndContact, this);
-        this.sensor = null;
+        return false;
     }
 }

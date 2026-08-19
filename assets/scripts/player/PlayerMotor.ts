@@ -1,4 +1,4 @@
-import { _decorator, Component, RigidBody2D, Vec2 } from 'cc';
+import { _decorator, Component, Node, RigidBody2D, Vec2 } from 'cc';
 import { KeyboardInput } from '../input/KeyboardInput';
 import { GroundSensor } from './GroundSensor';
 
@@ -11,8 +11,11 @@ export class PlayerMotor extends Component {
     @property({ type: KeyboardInput, tooltip: 'KeyboardInput on the Player node.' })
     public keyboardInput: KeyboardInput | null = null;
 
-    @property({ type: GroundSensor, tooltip: 'GroundSensor on the foot sensor child.' })
+    @property({ type: GroundSensor, tooltip: 'GroundSensor on the GroundProbe child.' })
     public groundSensor: GroundSensor | null = null;
+
+    @property({ type: Node, tooltip: 'Visual child to flip without scaling the physics root.' })
+    public visualRoot: Node | null = null;
 
     @property({ tooltip: 'Maximum horizontal speed in pixels per second.' })
     public maxMoveSpeed = 260;
@@ -38,8 +41,10 @@ export class PlayerMotor extends Component {
 
     protected onLoad(): void {
         this.body = this.getComponent(RigidBody2D);
-        this.baseScaleX = Math.abs(this.node.scale.x) || 1;
-        this.facingSign = this.node.scale.x < 0 ? -1 : 1;
+        if (this.visualRoot) {
+            this.baseScaleX = Math.abs(this.visualRoot.scale.x) || 1;
+            this.facingSign = this.visualRoot.scale.x < 0 ? -1 : 1;
+        }
 
         if (this.body) {
             this.body.gravityScale = this.gravityScale;
@@ -54,26 +59,27 @@ export class PlayerMotor extends Component {
         this.body.gravityScale = this.gravityScale;
 
         const velocity = this.body.linearVelocity;
+        const grounded = this.groundSensor.isGrounded;
         const direction = this.keyboardInput.horizontal;
         const targetSpeed = direction * this.maxMoveSpeed;
         const rate = direction === 0
             ? this.deceleration
-            : (this.groundSensor.isGrounded ? this.groundAcceleration : this.airAcceleration);
+            : (grounded ? this.groundAcceleration : this.airAcceleration);
         const nextX = this.moveTowards(velocity.x, targetSpeed, rate * deltaTime);
         let nextY = velocity.y;
 
-        if (this.keyboardInput.consumeJumpPressed() && this.groundSensor.isGrounded) {
+        if (this.keyboardInput.consumeJumpPressed() && grounded) {
             nextY = this.jumpSpeed;
         }
 
         this.body.linearVelocity = new Vec2(nextX, nextY);
 
-        if (direction !== 0 && direction !== this.facingSign) {
+        if (this.visualRoot && direction !== 0 && direction !== this.facingSign) {
             this.facingSign = direction;
-            this.node.setScale(
+            this.visualRoot.setScale(
                 this.baseScaleX * this.facingSign,
-                this.node.scale.y,
-                this.node.scale.z,
+                this.visualRoot.scale.y,
+                this.visualRoot.scale.z,
             );
         }
     }
