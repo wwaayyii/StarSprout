@@ -7,11 +7,12 @@ const { ccclass } = _decorator;
 export class KeyboardInput extends Component {
     private readonly heldKeys = new Set<KeyCode>();
     private jumpHeld = false;
-    private jumpPressed = false;
+    private keyboardJumpPressed = false;
     private virtualLeftHeld = false;
     private virtualRightHeld = false;
     private virtualDownHeld = false;
     private virtualJumpHeld = false;
+    private virtualJumpPressed = false;
 
     /** Horizontal intent in the range [-1, 1]. Opposing keys cancel out. */
     public get horizontal(): number {
@@ -45,7 +46,7 @@ export class KeyboardInput extends Component {
     /** Updates the virtual jump button and records only its pressed edge. */
     public setVirtualJump(held: boolean): void {
         if (held && !this.virtualJumpHeld) {
-            this.jumpPressed = true;
+            this.virtualJumpPressed = true;
         }
         this.virtualJumpHeld = held;
     }
@@ -56,29 +57,31 @@ export class KeyboardInput extends Component {
         this.virtualRightHeld = false;
         this.virtualDownHeld = false;
         this.virtualJumpHeld = false;
+        this.virtualJumpPressed = false;
     }
 
     /** Returns a jump press once, so holding Space cannot repeatedly jump. */
     public consumeJumpPressed(): boolean {
-        const pressed = this.jumpPressed;
-        this.jumpPressed = false;
+        const pressed = this.keyboardJumpPressed || this.virtualJumpPressed;
+        this.keyboardJumpPressed = false;
+        this.virtualJumpPressed = false;
         return pressed;
     }
 
     protected onEnable(): void {
         input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
         input.on(Input.EventType.KEY_UP, this.onKeyUp, this);
-        game.on(Game.EVENT_HIDE, this.clearInput, this);
+        game.on(Game.EVENT_HIDE, this.clearState, this);
     }
 
     protected onDisable(): void {
         this.removeListeners();
-        this.clearInput();
+        this.clearState();
     }
 
     protected onDestroy(): void {
         this.removeListeners();
-        this.clearInput();
+        this.clearState();
     }
 
     private onKeyDown(event: EventKeyboard): void {
@@ -95,7 +98,7 @@ export class KeyboardInput extends Component {
                 break;
             case KeyCode.SPACE:
                 if (!this.jumpHeld) {
-                    this.jumpPressed = true;
+                    this.keyboardJumpPressed = true;
                 }
                 this.jumpHeld = true;
                 break;
@@ -120,16 +123,18 @@ export class KeyboardInput extends Component {
         }
     }
 
-    private clearInput(): void {
+    /** Clears every input source when this component can no longer receive releases. */
+    private clearState(): void {
         this.heldKeys.clear();
         this.jumpHeld = false;
-        this.jumpPressed = false;
         this.clearVirtualInput();
+        this.keyboardJumpPressed = false;
+        this.virtualJumpPressed = false;
     }
 
     private removeListeners(): void {
         input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
         input.off(Input.EventType.KEY_UP, this.onKeyUp, this);
-        game.off(Game.EVENT_HIDE, this.clearInput, this);
+        game.off(Game.EVENT_HIDE, this.clearState, this);
     }
 }

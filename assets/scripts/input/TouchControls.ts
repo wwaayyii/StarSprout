@@ -42,10 +42,10 @@ export class TouchControls extends Component {
             return;
         }
 
-        this.bindButton(this.leftButton, this.pressLeft, this.releaseLeft);
-        this.bindButton(this.rightButton, this.pressRight, this.releaseRight);
-        this.bindButton(this.downButton, this.pressDown, this.releaseDown);
-        this.bindButton(this.jumpButton, this.pressJump, this.releaseJump);
+        this.bindButton(this.leftButton, this.pressLeft, this.releaseLeft, this.releaseLeft);
+        this.bindButton(this.rightButton, this.pressRight, this.releaseRight, this.releaseRight);
+        this.bindButton(this.downButton, this.pressDown, this.releaseDown, this.releaseDown);
+        this.bindButton(this.jumpButton, this.pressJump, this.releaseJump, this.cancelJump);
         game.on(Game.EVENT_HIDE, this.releaseVirtualInput, this);
         this.listening = true;
     }
@@ -55,30 +55,40 @@ export class TouchControls extends Component {
             return;
         }
 
-        this.unbindButton(this.leftButton, this.pressLeft, this.releaseLeft);
-        this.unbindButton(this.rightButton, this.pressRight, this.releaseRight);
-        this.unbindButton(this.downButton, this.pressDown, this.releaseDown);
-        this.unbindButton(this.jumpButton, this.pressJump, this.releaseJump);
+        this.unbindButton(this.leftButton, this.pressLeft, this.releaseLeft, this.releaseLeft);
+        this.unbindButton(this.rightButton, this.pressRight, this.releaseRight, this.releaseRight);
+        this.unbindButton(this.downButton, this.pressDown, this.releaseDown, this.releaseDown);
+        this.unbindButton(this.jumpButton, this.pressJump, this.releaseJump, this.cancelJump);
         game.off(Game.EVENT_HIDE, this.releaseVirtualInput, this);
         this.listening = false;
     }
 
-    private bindButton(node: Node | null, press: () => void, release: () => void): void {
+    private bindButton(
+        node: Node | null,
+        press: () => void,
+        release: () => void,
+        cancel: () => void,
+    ): void {
         if (!node) {
             return;
         }
         node.on(Node.EventType.TOUCH_START, press, this);
         node.on(Node.EventType.TOUCH_END, release, this);
-        node.on(Node.EventType.TOUCH_CANCEL, release, this);
+        node.on(Node.EventType.TOUCH_CANCEL, cancel, this);
     }
 
-    private unbindButton(node: Node | null, press: () => void, release: () => void): void {
+    private unbindButton(
+        node: Node | null,
+        press: () => void,
+        release: () => void,
+        cancel: () => void,
+    ): void {
         if (!node) {
             return;
         }
         node.off(Node.EventType.TOUCH_START, press, this);
         node.off(Node.EventType.TOUCH_END, release, this);
-        node.off(Node.EventType.TOUCH_CANCEL, release, this);
+        node.off(Node.EventType.TOUCH_CANCEL, cancel, this);
     }
 
     private readonly pressLeft = (): void => this.keyboardInput?.setVirtualLeft(true);
@@ -89,6 +99,7 @@ export class TouchControls extends Component {
     private readonly releaseDown = (): void => this.keyboardInput?.setVirtualDown(false);
     private readonly pressJump = (): void => this.keyboardInput?.setVirtualJump(true);
     private readonly releaseJump = (): void => this.keyboardInput?.setVirtualJump(false);
+    private readonly cancelJump = (): void => this.keyboardInput?.clearVirtualInput();
 
     private readonly releaseVirtualInput = (): void => {
         this.keyboardInput?.clearVirtualInput();
