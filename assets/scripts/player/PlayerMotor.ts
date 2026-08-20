@@ -35,9 +35,21 @@ export class PlayerMotor extends Component {
     @property({ tooltip: 'Gravity multiplier used by RigidBody2D.' })
     public gravityScale = 3;
 
+    @property({ min: 0, tooltip: 'Seconds during which one-way platform contacts are ignored.' })
+    public dropThroughDuration = 0.25;
+
+    @property({ min: 0, tooltip: 'Initial downward speed used to leave a one-way platform.' })
+    public dropThroughSpeed = 2;
+
     private body: RigidBody2D | null = null;
     private facingSign = 1;
     private baseScaleX = 1;
+    private dropThroughTimeRemaining = 0;
+
+    /** Whether one-way platforms should currently let this player pass downward. */
+    public get isDroppingThroughPlatform(): boolean {
+        return this.dropThroughTimeRemaining > 0;
+    }
 
     protected onLoad(): void {
         this.body = this.getComponent(RigidBody2D);
@@ -52,6 +64,11 @@ export class PlayerMotor extends Component {
     }
 
     protected update(deltaTime: number): void {
+        this.dropThroughTimeRemaining = Math.max(
+            0,
+            this.dropThroughTimeRemaining - deltaTime,
+        );
+
         if (!this.body || !this.keyboardInput || !this.groundSensor) {
             return;
         }
@@ -69,7 +86,12 @@ export class PlayerMotor extends Component {
         let nextY = velocity.y;
 
         if (this.keyboardInput.consumeJumpPressed() && grounded) {
-            nextY = this.jumpSpeed;
+            if (this.keyboardInput.downHeld) {
+                this.dropThroughTimeRemaining = this.dropThroughDuration;
+                nextY = -this.dropThroughSpeed;
+            } else {
+                nextY = this.jumpSpeed;
+            }
         }
 
         this.body.linearVelocity = new Vec2(nextX, nextY);
@@ -82,6 +104,14 @@ export class PlayerMotor extends Component {
                 this.visualRoot.scale.z,
             );
         }
+    }
+
+    protected onDisable(): void {
+        this.dropThroughTimeRemaining = 0;
+    }
+
+    protected onDestroy(): void {
+        this.dropThroughTimeRemaining = 0;
     }
 
     private moveTowards(current: number, target: number, maxDelta: number): number {

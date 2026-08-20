@@ -18,6 +18,12 @@ export class KeyboardInput extends Component {
         return Number(rightHeld) - Number(leftHeld);
     }
 
+    /** Whether either supported down key is currently held. */
+    public get downHeld(): boolean {
+        return this.heldKeys.has(KeyCode.KEY_S)
+            || this.heldKeys.has(KeyCode.ARROW_DOWN);
+    }
+
     /** Returns a jump press once, so holding Space cannot repeatedly jump. */
     public consumeJumpPressed(): boolean {
         const pressed = this.jumpPressed;
@@ -49,6 +55,10 @@ export class KeyboardInput extends Component {
             case KeyCode.ARROW_RIGHT:
                 this.heldKeys.add(event.keyCode);
                 break;
+            case KeyCode.KEY_S:
+            case KeyCode.ARROW_DOWN:
+                this.heldKeys.add(event.keyCode);
+                break;
             case KeyCode.SPACE:
                 if (!this.jumpHeld) {
                     this.jumpPressed = true;
@@ -64,6 +74,10 @@ export class KeyboardInput extends Component {
             case KeyCode.ARROW_LEFT:
             case KeyCode.KEY_D:
             case KeyCode.ARROW_RIGHT:
+                this.heldKeys.delete(event.keyCode);
+                break;
+            case KeyCode.KEY_S:
+            case KeyCode.ARROW_DOWN:
                 this.heldKeys.delete(event.keyCode);
                 break;
             case KeyCode.SPACE:
