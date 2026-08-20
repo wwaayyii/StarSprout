@@ -7,7 +7,13 @@ const { ccclass } = _decorator;
 export class KeyboardInput extends Component {
     private readonly heldKeys = new Set<KeyCode>();
     private jumpHeld = false;
-    private jumpPressed = false;
+    private keyboardJumpPressed = false;
+    private virtualLeftHeld = false;
+    private virtualRightHeld = false;
+    private virtualDownHeld = false;
+    private virtualHorizontal = 0;
+    private virtualJumpHeld = false;
+    private virtualJumpPressed = false;
 
     /** Horizontal intent in the range [-1, 1]. Opposing keys cancel out. */
     public get horizontal(): number {
@@ -15,36 +21,89 @@ export class KeyboardInput extends Component {
             || this.heldKeys.has(KeyCode.ARROW_LEFT);
         const rightHeld = this.heldKeys.has(KeyCode.KEY_D)
             || this.heldKeys.has(KeyCode.ARROW_RIGHT);
-        return Number(rightHeld) - Number(leftHeld);
+        const keyboardHorizontal = Number(rightHeld) - Number(leftHeld);
+        if (leftHeld || rightHeld) {
+            return keyboardHorizontal;
+        }
+
+        const virtualButtonHorizontal = Number(this.virtualRightHeld)
+            - Number(this.virtualLeftHeld);
+        return this.virtualLeftHeld || this.virtualRightHeld
+            ? virtualButtonHorizontal
+            : this.virtualHorizontal;
     }
 
     /** Whether either supported down key is currently held. */
     public get downHeld(): boolean {
-        return this.heldKeys.has(KeyCode.KEY_S)
+        return this.virtualDownHeld
+            || this.heldKeys.has(KeyCode.KEY_S)
             || this.heldKeys.has(KeyCode.ARROW_DOWN);
+    }
+
+    public setVirtualLeft(held: boolean): void {
+        this.virtualLeftHeld = held;
+    }
+
+    public setVirtualRight(held: boolean): void {
+        this.virtualRightHeld = held;
+    }
+
+    public setVirtualDown(held: boolean): void {
+        this.virtualDownHeld = held;
+    }
+
+    /** Sets analog horizontal intent from a virtual joystick. */
+    public setVirtualHorizontal(value: number): void {
+        this.virtualHorizontal = Number.isFinite(value)
+            ? Math.max(-1, Math.min(1, value))
+            : 0;
+    }
+
+    /** Updates the virtual jump button and records only its pressed edge. */
+    public setVirtualJump(held: boolean): void {
+        if (held && !this.virtualJumpHeld) {
+            this.virtualJumpPressed = true;
+        }
+        this.virtualJumpHeld = held;
+    }
+
+    /** Cancels only the virtual jump without disturbing joystick or keyboard input. */
+    public cancelVirtualJump(): void {
+        this.virtualJumpHeld = false;
+        this.virtualJumpPressed = false;
+    }
+
+    /** Releases virtual controls without disturbing physical keyboard state. */
+    public clearVirtualInput(): void {
+        this.virtualLeftHeld = false;
+        this.virtualRightHeld = false;
+        this.virtualDownHeld = false;
+        this.virtualHorizontal = 0;
+        this.cancelVirtualJump();
     }
 
     /** Returns a jump press once, so holding Space cannot repeatedly jump. */
     public consumeJumpPressed(): boolean {
-        const pressed = this.jumpPressed;
-        this.jumpPressed = false;
+        const pressed = this.keyboardJumpPressed || this.virtualJumpPressed;
+        this.keyboardJumpPressed = false;
+        this.virtualJumpPressed = false;
         return pressed;
     }
 
     protected onEnable(): void {
         input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
         input.on(Input.EventType.KEY_UP, this.onKeyUp, this);
-        game.on(Game.EVENT_HIDE, this.clearInput, this);
+        game.on(Game.EVENT_HIDE, this.clearState, this);
     }
 
     protected onDisable(): void {
         this.removeListeners();
-        this.clearInput();
+        this.clearState();
     }
 
     protected onDestroy(): void {
         this.removeListeners();
-        this.clearInput();
+        this.clearState();
     }
 
     private onKeyDown(event: EventKeyboard): void {
@@ -61,7 +120,7 @@ export class KeyboardInput extends Component {
                 break;
             case KeyCode.SPACE:
                 if (!this.jumpHeld) {
-                    this.jumpPressed = true;
+                    this.keyboardJumpPressed = true;
                 }
                 this.jumpHeld = true;
                 break;
@@ -86,15 +145,18 @@ export class KeyboardInput extends Component {
         }
     }
 
-    private clearInput(): void {
+    /** Clears every input source when this component can no longer receive releases. */
+    private clearState(): void {
         this.heldKeys.clear();
         this.jumpHeld = false;
-        this.jumpPressed = false;
+        this.clearVirtualInput();
+        this.keyboardJumpPressed = false;
+        this.virtualJumpPressed = false;
     }
 
     private removeListeners(): void {
         input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
         input.off(Input.EventType.KEY_UP, this.onKeyUp, this);
-        game.off(Game.EVENT_HIDE, this.clearInput, this);
+        game.off(Game.EVENT_HIDE, this.clearState, this);
     }
 }

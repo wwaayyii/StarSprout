@@ -96,8 +96,9 @@ export class PlayerMotor extends Component {
 
         this.body.linearVelocity = new Vec2(nextX, nextY);
 
-        if (this.visualRoot && direction !== 0 && direction !== this.facingSign) {
-            this.facingSign = direction;
+        const directionSign = Math.sign(direction);
+        if (this.visualRoot && directionSign !== 0 && directionSign !== this.facingSign) {
+            this.facingSign = directionSign;
             this.visualRoot.setScale(
                 this.baseScaleX * this.facingSign,
                 this.visualRoot.scale.y,
