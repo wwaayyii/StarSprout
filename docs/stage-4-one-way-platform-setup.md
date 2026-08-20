@@ -14,12 +14,13 @@
 
 1. 选中平台节点，确认节点上已有 `BoxCollider2D`。
 2. 在 `BoxCollider2D` 中关闭 **Sensor**。单向平台必须是实体碰撞体。
-3. 点击 **添加组件**，搜索并添加 `OneWayPlatform`。
-4. 保留初始参数开始测试：
+3. 添加 `RigidBody2D`，将 **Type** 设为 **Static**，并勾选 **Enabled Contact Listener**。
+4. 点击 **添加组件**，搜索并添加 `OneWayPlatform`。
+5. 保留初始参数开始测试：
    - **Upward Velocity Tolerance = 0.1**：只有明显向上运动时才忽略当帧接触，可过滤接近零的速度误差。
    - **Surface Tolerance = 2**：玩家脚底在平台顶面以下超过 2 像素时忽略接触，避免玩家从内部或底部被挡住；若边缘处出现轻微抖动，可小幅调整该值。
 
-平台不需要添加 Dynamic `RigidBody2D`。保持静态平台配置即可；不要为了单向效果把平台改成动态刚体。
+每个单向平台都必须同时具有非 Sensor 的 `BoxCollider2D`、Type 为 Static 且勾选 **Enabled Contact Listener** 的 `RigidBody2D`，以及 `OneWayPlatform`。不要为了单向效果把平台改成 Dynamic 刚体。
 
 ## 验收测试
 
@@ -38,8 +39,9 @@
 1. 首先选择 `World/Player`，确认其 `RigidBody2D` 已勾选 **Enabled Contact Listener**。
 2. 确认项目当前使用的 2D 物理系统为 **Box2D**。
 3. 确认平台 `BoxCollider2D` 的 **Sensor** 已关闭。
-4. 确认 `OneWayPlatform` 与平台的 `BoxCollider2D` 位于同一个节点上。
+4. 确认平台有 Type 为 Static 的 `RigidBody2D`，并已勾选 **Enabled Contact Listener**。
+5. 确认 `OneWayPlatform` 与平台的 `BoxCollider2D` 位于同一个节点上。
 
 ## 当前范围
 
-本阶段暂不实现按下方向键主动下穿平台。玩家站在平台上时，向下输入不会关闭碰撞；该交互留待后续阶段实现。
+第 4 阶段只覆盖单向平台的基础碰撞配置；主动下穿操作参见第 5 阶段文档。

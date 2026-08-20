@@ -59,8 +59,20 @@ export class OneWayPlatform extends Component {
         }
 
         const platformCollider = this.getPlatformCollider();
-        const playerBody = this.getDynamicPlayerBody(otherCollider);
-        if (!platformCollider || !playerBody) {
+        const playerMotor = this.findPlayerMotor(otherCollider.node);
+        const playerBody = otherCollider.body;
+        if (
+            !platformCollider
+            || !playerMotor
+            || !playerBody
+            || playerBody.type !== ERigidBody2DType.Dynamic
+        ) {
+            return;
+        }
+
+        // An intentional drop takes priority over the normal velocity/height rules.
+        if (playerMotor.isDroppingThroughPlatform) {
+            contact.disabledOnce = true;
             return;
         }
 
@@ -78,15 +90,6 @@ export class OneWayPlatform extends Component {
             this.platformCollider = this.getComponent(BoxCollider2D);
         }
         return this.platformCollider;
-    }
-
-    private getDynamicPlayerBody(collider: Collider2D): RigidBody2D | null {
-        if (!this.findPlayerMotor(collider.node)) {
-            return null;
-        }
-
-        const body = collider.body;
-        return body?.type === ERigidBody2DType.Dynamic ? body : null;
     }
 
     private findPlayerMotor(node: Node): PlayerMotor | null {
