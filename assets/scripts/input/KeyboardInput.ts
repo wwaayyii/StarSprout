@@ -8,6 +8,10 @@ export class KeyboardInput extends Component {
     private readonly heldKeys = new Set<KeyCode>();
     private jumpHeld = false;
     private jumpPressed = false;
+    private virtualLeftHeld = false;
+    private virtualRightHeld = false;
+    private virtualDownHeld = false;
+    private virtualJumpHeld = false;
 
     /** Horizontal intent in the range [-1, 1]. Opposing keys cancel out. */
     public get horizontal(): number {
@@ -15,13 +19,43 @@ export class KeyboardInput extends Component {
             || this.heldKeys.has(KeyCode.ARROW_LEFT);
         const rightHeld = this.heldKeys.has(KeyCode.KEY_D)
             || this.heldKeys.has(KeyCode.ARROW_RIGHT);
-        return Number(rightHeld) - Number(leftHeld);
+        return Number(rightHeld || this.virtualRightHeld)
+            - Number(leftHeld || this.virtualLeftHeld);
     }
 
     /** Whether either supported down key is currently held. */
     public get downHeld(): boolean {
-        return this.heldKeys.has(KeyCode.KEY_S)
+        return this.virtualDownHeld
+            || this.heldKeys.has(KeyCode.KEY_S)
             || this.heldKeys.has(KeyCode.ARROW_DOWN);
+    }
+
+    public setVirtualLeft(held: boolean): void {
+        this.virtualLeftHeld = held;
+    }
+
+    public setVirtualRight(held: boolean): void {
+        this.virtualRightHeld = held;
+    }
+
+    public setVirtualDown(held: boolean): void {
+        this.virtualDownHeld = held;
+    }
+
+    /** Updates the virtual jump button and records only its pressed edge. */
+    public setVirtualJump(held: boolean): void {
+        if (held && !this.virtualJumpHeld) {
+            this.jumpPressed = true;
+        }
+        this.virtualJumpHeld = held;
+    }
+
+    /** Releases virtual controls without disturbing physical keyboard state. */
+    public clearVirtualInput(): void {
+        this.virtualLeftHeld = false;
+        this.virtualRightHeld = false;
+        this.virtualDownHeld = false;
+        this.virtualJumpHeld = false;
     }
 
     /** Returns a jump press once, so holding Space cannot repeatedly jump. */
@@ -90,6 +124,7 @@ export class KeyboardInput extends Component {
         this.heldKeys.clear();
         this.jumpHeld = false;
         this.jumpPressed = false;
+        this.clearVirtualInput();
     }
 
     private removeListeners(): void {
