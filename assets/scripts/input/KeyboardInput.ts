@@ -13,6 +13,7 @@ export class KeyboardInput extends Component {
     private virtualDownHeld = false;
     private virtualJumpHeld = false;
     private virtualJumpPressed = false;
+    private virtualHorizontal = 0;
 
     /** Horizontal intent in the range [-1, 1]. Opposing keys cancel out. */
     public get horizontal(): number {
@@ -20,8 +21,15 @@ export class KeyboardInput extends Component {
             || this.heldKeys.has(KeyCode.ARROW_LEFT);
         const rightHeld = this.heldKeys.has(KeyCode.KEY_D)
             || this.heldKeys.has(KeyCode.ARROW_RIGHT);
-        return Number(rightHeld || this.virtualRightHeld)
-            - Number(leftHeld || this.virtualLeftHeld);
+        const keyboardHorizontal = Number(rightHeld) - Number(leftHeld);
+        if (leftHeld || rightHeld) {
+            return keyboardHorizontal;
+        }
+
+        const buttonHorizontal = Number(this.virtualRightHeld) - Number(this.virtualLeftHeld);
+        return this.virtualLeftHeld || this.virtualRightHeld
+            ? buttonHorizontal
+            : this.virtualHorizontal;
     }
 
     /** Whether either supported down key is currently held. */
@@ -43,12 +51,23 @@ export class KeyboardInput extends Component {
         this.virtualDownHeld = held;
     }
 
+    /** Sets analog horizontal intent from a virtual joystick. */
+    public setVirtualHorizontal(value: number): void {
+        this.virtualHorizontal = Math.max(-1, Math.min(1, value));
+    }
+
     /** Updates the virtual jump button and records only its pressed edge. */
     public setVirtualJump(held: boolean): void {
         if (held && !this.virtualJumpHeld) {
             this.virtualJumpPressed = true;
         }
         this.virtualJumpHeld = held;
+    }
+
+    /** Cancels only virtual jump state, leaving other touch controls intact. */
+    public cancelVirtualJump(): void {
+        this.virtualJumpHeld = false;
+        this.virtualJumpPressed = false;
     }
 
     /** Releases virtual controls without disturbing physical keyboard state. */
@@ -58,6 +77,7 @@ export class KeyboardInput extends Component {
         this.virtualDownHeld = false;
         this.virtualJumpHeld = false;
         this.virtualJumpPressed = false;
+        this.virtualHorizontal = 0;
     }
 
     /** Returns a jump press once, so holding Space cannot repeatedly jump. */

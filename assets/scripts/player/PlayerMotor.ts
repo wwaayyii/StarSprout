@@ -77,9 +77,9 @@ export class PlayerMotor extends Component {
 
         const velocity = this.body.linearVelocity;
         const grounded = this.groundSensor.isGrounded;
-        const direction = this.keyboardInput.horizontal;
-        const targetSpeed = direction * this.maxMoveSpeed;
-        const rate = direction === 0
+        const horizontal = this.keyboardInput.horizontal;
+        const targetSpeed = horizontal * this.maxMoveSpeed;
+        const rate = horizontal === 0
             ? this.deceleration
             : (grounded ? this.groundAcceleration : this.airAcceleration);
         const nextX = this.moveTowards(velocity.x, targetSpeed, rate * deltaTime);
@@ -96,8 +96,9 @@ export class PlayerMotor extends Component {
 
         this.body.linearVelocity = new Vec2(nextX, nextY);
 
-        if (this.visualRoot && direction !== 0 && direction !== this.facingSign) {
-            this.facingSign = direction;
+        const horizontalSign = Math.sign(horizontal);
+        if (this.visualRoot && horizontalSign !== 0 && horizontalSign !== this.facingSign) {
+            this.facingSign = horizontalSign;
             this.visualRoot.setScale(
                 this.baseScaleX * this.facingSign,
                 this.visualRoot.scale.y,
