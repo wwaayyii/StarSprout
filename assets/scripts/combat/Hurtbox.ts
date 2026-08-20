@@ -4,6 +4,7 @@ import type { Hitbox } from './Hitbox';
 import { canDamageTeam, Team } from './Team';
 
 const { ccclass, property, requireComponent } = _decorator;
+const MAX_REMEMBERED_ATTACK_IDS = 128;
 
 /** Receives and validates hit requests before forwarding them to health. */
 @ccclass('Hurtbox')
@@ -43,8 +44,10 @@ export class Hurtbox extends Component {
             return false;
         }
 
-        // Record only a fully validated request. Damageable may still reject it when dead.
-        this.receivedAttackIds.add(attackId);
+        // Keep a bounded insertion-ordered history: an unbounded Set would retain one entry
+        // for every attack seen during a long session. Hitbox also guards its active attack,
+        // so retaining the most recent IDs here provides cross-callback deduplication safely.
+        this.rememberAttackId(attackId);
         return target.takeDamage(hitbox.damage, hitbox.getKnockback());
     }
 
@@ -55,5 +58,17 @@ export class Hurtbox extends Component {
     protected onDestroy(): void {
         this.receivedAttackIds.clear();
         this.damageable = null;
+    }
+
+    private rememberAttackId(attackId: number): void {
+        this.receivedAttackIds.add(attackId);
+        if (this.receivedAttackIds.size <= MAX_REMEMBERED_ATTACK_IDS) {
+            return;
+        }
+
+        const oldestAttackId = this.receivedAttackIds.values().next();
+        if (!oldestAttackId.done) {
+            this.receivedAttackIds.delete(oldestAttackId.value);
+        }
     }
 }

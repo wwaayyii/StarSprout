@@ -11,7 +11,7 @@
 
 ## 2. Player 受击配置
 
-1. 打开测试场景，选中 `World/Actors/Player` 根节点。
+1. 打开测试场景，选中 `World/Player` 根节点。
 2. 添加 `Damageable`，将 **Max Health** 暂设为 `100`。
 3. 建议在 Player 下新建 `Hurtbox` 子节点，使受击范围可以独立于移动碰撞体调整。
 4. 给子节点添加 `BoxCollider2D`（也可按角色轮廓选 `CapsuleCollider2D`），勾选 **Sensor**，调整尺寸覆盖身体。
