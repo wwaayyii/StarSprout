@@ -99,7 +99,7 @@ export class TouchControls extends Component {
     private readonly releaseDown = (): void => this.keyboardInput?.setVirtualDown(false);
     private readonly pressJump = (): void => this.keyboardInput?.setVirtualJump(true);
     private readonly releaseJump = (): void => this.keyboardInput?.setVirtualJump(false);
-    private readonly cancelJump = (): void => this.keyboardInput?.clearVirtualInput();
+    private readonly cancelJump = (): void => this.keyboardInput?.cancelVirtualJump();
 
     private readonly releaseVirtualInput = (): void => {
         this.keyboardInput?.clearVirtualInput();
