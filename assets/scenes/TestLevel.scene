@@ -1927,6 +1927,8 @@
     "deceleration": 45,
     "jumpSpeed": 15,
     "gravityScale": 3,
+    "dropThroughDuration": 0.25,
+    "dropThroughSpeed": 2,
     "_id": "2aOjKaLoVCtqCqmDTJh45+"
   },
   {
