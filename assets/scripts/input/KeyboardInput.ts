@@ -67,7 +67,7 @@ export class KeyboardInput extends Component {
         this.virtualJumpHeld = held;
     }
 
-    /** Cancels only the virtual jump without disturbing joystick or keyboard input. */
+    /** Cancels only virtual jump state, preserving joystick and keyboard input. */
     public cancelVirtualJump(): void {
         this.virtualJumpHeld = false;
         this.virtualJumpPressed = false;

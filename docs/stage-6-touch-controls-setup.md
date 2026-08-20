@@ -2,6 +2,8 @@
 
 本阶段为 1280×720 横屏的微信小游戏增加屏幕虚拟按键。按钮暂时使用简单色块和文字即可，正式像素 UI 后续替换。
 
+如改用左侧虚拟摇杆，请继续参考 [`stage-6-virtual-joystick-setup.md`](stage-6-virtual-joystick-setup.md)；右侧 JumpButton 的配置保持不变。
+
 ## 节点与组件
 
 1. 在 `Camera/HUD` 下创建空节点 `TouchControls`。HUD 位于 Camera 下，因此控件会保持屏幕固定。
