@@ -103,12 +103,25 @@ export class KeyboardInput extends Component {
         return pressed;
     }
 
-    /** Returns one combined attack edge while keeping both input sources independent. */
-    public consumeAttackPressed(): boolean {
-        const pressed = this.keyboardAttackPressed || this.virtualAttackPressed;
+    /** Consumes only the pending physical-keyboard attack edge. */
+    public consumeKeyboardAttackPressed(): boolean {
+        const pressed = this.keyboardAttackPressed;
         this.keyboardAttackPressed = false;
+        return pressed;
+    }
+
+    /** Consumes only the pending touch-button attack edge. */
+    public consumeVirtualAttackPressed(): boolean {
+        const pressed = this.virtualAttackPressed;
         this.virtualAttackPressed = false;
         return pressed;
+    }
+
+    /** Consumes every pending source and merges them into one attack intent. */
+    public consumeAttackPressed(): boolean {
+        const keyboardPressed = this.consumeKeyboardAttackPressed();
+        const virtualPressed = this.consumeVirtualAttackPressed();
+        return keyboardPressed || virtualPressed;
     }
 
     protected onEnable(): void {
