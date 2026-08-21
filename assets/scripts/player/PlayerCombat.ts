@@ -1,4 +1,4 @@
-import { _decorator, Component, game, Game, warn } from 'cc';
+import { _decorator, Color, Component, game, Game, log, Sprite, warn } from 'cc';
 import { Hitbox } from '../combat/Hitbox';
 import { KeyboardInput } from '../input/KeyboardInput';
 
@@ -12,6 +12,9 @@ export class PlayerCombat extends Component {
 
     @property(Hitbox)
     public hitbox: Hitbox | null = null;
+
+    @property({ type: Sprite, tooltip: 'Optional debug sprite shown while the attack hitbox is active.' })
+    public hitboxSprite: Sprite | null = null;
 
     @property({ min: 0, tooltip: 'Seconds for which the attack Hitbox stays active.' })
     public attackActiveDuration = 0.15;
@@ -33,6 +36,7 @@ export class PlayerCombat extends Component {
 
     protected onEnable(): void {
         game.on(Game.EVENT_HIDE, this.resetAttack, this);
+        this.hideHitboxSprite();
         this.validateReferences();
     }
 
@@ -62,9 +66,12 @@ export class PlayerCombat extends Component {
 
     private startAttack(): void {
         this.hitbox?.beginAttack();
+        log('[PlayerCombat] Attack started');
+        this.showHitboxSprite();
         this.activeTimeRemaining = Math.max(0, this.attackActiveDuration);
         if (this.activeTimeRemaining === 0) {
             this.hitbox?.endAttack();
+            this.hideHitboxSprite();
             this.recoveryTimeRemaining = Math.max(0, this.attackRecoveryDuration);
         }
     }
@@ -75,6 +82,7 @@ export class PlayerCombat extends Component {
             this.activeTimeRemaining = Math.max(0, activeBefore - dt);
             if (this.activeTimeRemaining === 0) {
                 this.hitbox?.endAttack();
+                this.hideHitboxSprite();
                 const overflow = Math.max(0, dt - activeBefore);
                 this.recoveryTimeRemaining = Math.max(0, this.attackRecoveryDuration - overflow);
             }
@@ -101,7 +109,22 @@ export class PlayerCombat extends Component {
 
     private readonly resetAttack = (): void => {
         this.hitbox?.endAttack();
+        this.hideHitboxSprite();
         this.activeTimeRemaining = 0;
         this.recoveryTimeRemaining = 0;
     };
+
+    private showHitboxSprite(): void {
+        if (!this.hitboxSprite?.isValid) {
+            return;
+        }
+        this.hitboxSprite.color = new Color(255, 255, 0, 128);
+        this.hitboxSprite.enabled = true;
+    }
+
+    private hideHitboxSprite(): void {
+        if (this.hitboxSprite?.isValid) {
+            this.hitboxSprite.enabled = false;
+        }
+    }
 }

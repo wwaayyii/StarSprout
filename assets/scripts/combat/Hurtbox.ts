@@ -32,15 +32,17 @@ export class Hurtbox extends Component {
             return false;
         }
         if (this.receivedAttackIds.has(attackId)) {
+            console.log('[Hurtbox] Hit rejected: duplicate attack');
             return false;
         }
         if (!canDamageTeam(hitbox.team, this.team)) {
+            console.log('[Hurtbox] Hit rejected: same team');
             return false;
         }
 
         const target = this.damageable;
         if (!target?.isValid) {
-            console.warn(`[Hurtbox] ${this.node.name} cannot receive attack ${attackId}: Damageable is not assigned or valid.`);
+            console.log('[Hurtbox] Hit rejected: missing Damageable');
             return false;
         }
 

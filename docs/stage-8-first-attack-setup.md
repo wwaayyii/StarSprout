@@ -14,6 +14,10 @@
 
 若未绑定 Keyboard Input 或 Hitbox，`PlayerCombat` 会安全停止攻击，并在控制台只输出一次指出缺失引用的警告。禁用组件、销毁节点或游戏切到后台时，当前攻击框会立即关闭且时序状态会被清空。
 
+可选地把 `PlayerHitbox` 节点上的 `Sprite` 绑定到 **Hitbox Sprite**。攻击有效期间它会显示为半透明黄色，结束后自动隐藏；不绑定不会影响攻击。
+
+`Hitbox` 在启用碰撞框后监听常规的 `BEGIN_CONTACT`，并在下一个物理帧通过 Cocos Creator 3.8.8 的 `PhysicsSystem2D.instance.testAABB(collider.worldAABB)` 查询 API 补查重叠的 `Collider2D`。补查会校验启动它的 `attackId`，因此攻击结束、组件禁用或新攻击开始后，旧查询不会造成伤害。
+
 ## 2. 手机 AttackButton 配置
 
 1. 在 `HUD/TouchControls` 下新建 `AttackButton`，按照 JumpButton 的 UI 尺寸与触摸区域设置，但放在不会遮挡 JumpButton 的位置。

@@ -3,9 +3,12 @@ import {
     Collider2D,
     Component,
     Contact2DType,
+    director,
+    Director,
     Enum,
     IPhysics2DContact,
     Node,
+    PhysicsSystem2D,
     Vec2,
 } from 'cc';
 import { Hurtbox } from './Hurtbox';
@@ -63,6 +66,8 @@ export class Hitbox extends Component {
         const collider = this.getCollider();
         if (collider) {
             collider.enabled = true;
+            const attackId = this.activeAttackId;
+            director.once(Director.EVENT_AFTER_PHYSICS, () => this.queryOverlaps(attackId), this);
         }
         return this.activeAttackId;
     }
@@ -101,14 +106,7 @@ export class Hitbox extends Component {
             return;
         }
 
-        const hurtbox = this.findHurtbox(otherCollider.node);
-        if (!hurtbox || this.hitTargets.has(hurtbox)) {
-            return;
-        }
-
-        // Reserve the target before dispatch so repeated callbacks cannot re-enter it.
-        this.hitTargets.add(hurtbox);
-        hurtbox.receiveHit(this, this.activeAttackId);
+        this.tryHitCollider(otherCollider, this.activeAttackId);
     }
 
     private getCollider(): Collider2D | null {
@@ -128,5 +126,38 @@ export class Hitbox extends Component {
             current = current.parent;
         }
         return null;
+    }
+
+    /** Catches colliders which were already overlapping when this attack was enabled. */
+    private queryOverlaps(attackId: number): void {
+        const collider = this.getCollider();
+        if (attackId !== this.activeAttackId || !this.enabledInHierarchy || !collider?.enabled) {
+            return;
+        }
+
+        const overlaps = PhysicsSystem2D.instance.testAABB(collider.worldAABB);
+        for (const overlap of overlaps) {
+            // Re-check on every iteration in case receiving a hit ends or replaces the attack.
+            if (attackId !== this.activeAttackId) {
+                return;
+            }
+            this.tryHitCollider(overlap, attackId);
+        }
+    }
+
+    private tryHitCollider(otherCollider: Collider2D, attackId: number): void {
+        if (attackId === 0 || attackId !== this.activeAttackId || otherCollider === this.collider) {
+            return;
+        }
+
+        const hurtbox = this.findHurtbox(otherCollider.node);
+        if (!hurtbox || this.hitTargets.has(hurtbox)) {
+            return;
+        }
+
+        // Reserve before dispatch so contacts and the overlap query cannot hit it twice.
+        this.hitTargets.add(hurtbox);
+        console.log(`[Hitbox] Hit target: ${hurtbox.node.name}`);
+        hurtbox.receiveHit(this, attackId);
     }
 }
