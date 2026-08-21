@@ -13,6 +13,9 @@ export class KeyboardInput extends Component {
     private virtualDownHeld = false;
     private virtualJumpHeld = false;
     private virtualJumpPressed = false;
+    private attackHeld = false;
+    private keyboardAttackPressed = false;
+    private virtualAttackPressed = false;
     private virtualHorizontal = 0;
 
     /** Horizontal intent in the range [-1, 1]. Opposing keys cancel out. */
@@ -70,6 +73,16 @@ export class KeyboardInput extends Component {
         this.virtualJumpPressed = false;
     }
 
+    /** Records one attack edge from a touch button. */
+    public pressVirtualAttack(): void {
+        this.virtualAttackPressed = true;
+    }
+
+    /** Cancels only pending touch attacks, without affecting the keyboard edge. */
+    public cancelVirtualAttack(): void {
+        this.virtualAttackPressed = false;
+    }
+
     /** Releases virtual controls without disturbing physical keyboard state. */
     public clearVirtualInput(): void {
         this.virtualLeftHeld = false;
@@ -78,6 +91,7 @@ export class KeyboardInput extends Component {
         this.virtualJumpHeld = false;
         this.virtualJumpPressed = false;
         this.virtualHorizontal = 0;
+        this.virtualAttackPressed = false;
     }
 
     /** Returns a jump press once, so holding Space cannot repeatedly jump. */
@@ -85,6 +99,14 @@ export class KeyboardInput extends Component {
         const pressed = this.keyboardJumpPressed || this.virtualJumpPressed;
         this.keyboardJumpPressed = false;
         this.virtualJumpPressed = false;
+        return pressed;
+    }
+
+    /** Returns one combined attack edge while keeping both input sources independent. */
+    public consumeAttackPressed(): boolean {
+        const pressed = this.keyboardAttackPressed || this.virtualAttackPressed;
+        this.keyboardAttackPressed = false;
+        this.virtualAttackPressed = false;
         return pressed;
     }
 
@@ -122,6 +144,12 @@ export class KeyboardInput extends Component {
                 }
                 this.jumpHeld = true;
                 break;
+            case KeyCode.KEY_J:
+                if (!this.attackHeld) {
+                    this.keyboardAttackPressed = true;
+                }
+                this.attackHeld = true;
+                break;
         }
     }
 
@@ -140,6 +168,9 @@ export class KeyboardInput extends Component {
             case KeyCode.SPACE:
                 this.jumpHeld = false;
                 break;
+            case KeyCode.KEY_J:
+                this.attackHeld = false;
+                break;
         }
     }
 
@@ -147,9 +178,11 @@ export class KeyboardInput extends Component {
     private clearState(): void {
         this.heldKeys.clear();
         this.jumpHeld = false;
+        this.attackHeld = false;
         this.clearVirtualInput();
         this.keyboardJumpPressed = false;
         this.virtualJumpPressed = false;
+        this.keyboardAttackPressed = false;
     }
 
     private removeListeners(): void {

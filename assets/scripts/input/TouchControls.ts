@@ -21,6 +21,9 @@ export class TouchControls extends Component {
     @property(Node)
     public jumpButton: Node | null = null;
 
+    @property(Node)
+    public attackButton: Node | null = null;
+
     private listening = false;
 
     protected onEnable(): void {
@@ -46,6 +49,7 @@ export class TouchControls extends Component {
         this.bindButton(this.rightButton, this.pressRight, this.releaseRight, this.releaseRight);
         this.bindButton(this.downButton, this.pressDown, this.releaseDown, this.releaseDown);
         this.bindButton(this.jumpButton, this.pressJump, this.releaseJump, this.cancelJump);
+        this.attackButton?.on(Node.EventType.TOUCH_START, this.pressAttack, this);
         game.on(Game.EVENT_HIDE, this.releaseVirtualInput, this);
         this.listening = true;
     }
@@ -59,6 +63,7 @@ export class TouchControls extends Component {
         this.unbindButton(this.rightButton, this.pressRight, this.releaseRight, this.releaseRight);
         this.unbindButton(this.downButton, this.pressDown, this.releaseDown, this.releaseDown);
         this.unbindButton(this.jumpButton, this.pressJump, this.releaseJump, this.cancelJump);
+        this.attackButton?.off(Node.EventType.TOUCH_START, this.pressAttack, this);
         game.off(Game.EVENT_HIDE, this.releaseVirtualInput, this);
         this.listening = false;
     }
@@ -100,6 +105,7 @@ export class TouchControls extends Component {
     private readonly pressJump = (): void => this.keyboardInput?.setVirtualJump(true);
     private readonly releaseJump = (): void => this.keyboardInput?.setVirtualJump(false);
     private readonly cancelJump = (): void => this.keyboardInput?.cancelVirtualJump();
+    private readonly pressAttack = (): void => this.keyboardInput?.pressVirtualAttack();
 
     private readonly releaseVirtualInput = (): void => {
         this.keyboardInput?.clearVirtualInput();
