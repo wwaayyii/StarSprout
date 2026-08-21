@@ -117,15 +117,11 @@ export class KeyboardInput extends Component {
         return pressed;
     }
 
-    /**
-     * Returns one attack edge from either source.
-     *
-     * Only the edge being returned is cleared. If keyboard and touch edges arrive
-     * in the same frame, the touch edge remains pending until the next update so
-     * one input source can never erase the other.
-     */
+    /** Consumes every pending source and merges them into one attack intent. */
     public consumeAttackPressed(): boolean {
-        return this.consumeKeyboardAttackPressed() || this.consumeVirtualAttackPressed();
+        const keyboardPressed = this.consumeKeyboardAttackPressed();
+        const virtualPressed = this.consumeVirtualAttackPressed();
+        return keyboardPressed || virtualPressed;
     }
 
     protected onEnable(): void {
