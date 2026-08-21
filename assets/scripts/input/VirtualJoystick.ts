@@ -1,4 +1,4 @@
-import { _decorator, Component, EventTouch, game, Game, Node, UITransform, Vec3 } from 'cc';
+import { _decorator, Component, EventTouch, game, Game, isValid, Node, UITransform, Vec3 } from 'cc';
 import { KeyboardInput } from './KeyboardInput';
 
 const { ccclass, property } = _decorator;
@@ -22,14 +22,20 @@ export class VirtualJoystick extends Component {
     public downThreshold = -0.5;
 
     private activeTouchId: number | null = null;
+    private listening = false;
     private readonly touchPosition = new Vec3();
 
     protected onEnable(): void {
+        if (this.listening || !isValid(this) || !isValid(this.node)) {
+            return;
+        }
+
         this.node.on(Node.EventType.TOUCH_START, this.onTouchStart, this);
         this.node.on(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
         this.node.on(Node.EventType.TOUCH_END, this.onTouchEnd, this);
         this.node.on(Node.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
         game.on(Game.EVENT_HIDE, this.resetJoystick, this);
+        this.listening = true;
     }
 
     protected onDisable(): void {
@@ -70,8 +76,13 @@ export class VirtualJoystick extends Component {
     }
 
     private updateJoystick(event: EventTouch): void {
+        if (!isValid(this) || !isValid(this.node)) {
+            this.activeTouchId = null;
+            return;
+        }
+
         const transform = this.getComponent(UITransform);
-        if (!transform) {
+        if (!transform || !isValid(transform)) {
             this.resetJoystick();
             return;
         }
@@ -92,27 +103,42 @@ export class VirtualJoystick extends Component {
             this.touchPosition.set(0, 0, 0);
         }
 
-        this.joystickHandle?.setPosition(this.touchPosition);
+        if (this.joystickHandle && isValid(this.joystickHandle)) {
+            this.joystickHandle.setPosition(this.touchPosition);
+        }
 
         const normalizedX = effectiveRadius > 0 ? this.touchPosition.x / effectiveRadius : 0;
         const normalizedY = effectiveRadius > 0 ? this.touchPosition.y / effectiveRadius : 0;
         const horizontal = Math.abs(normalizedX) >= this.deadZone ? normalizedX : 0;
-        this.keyboardInput?.setVirtualHorizontal(horizontal);
-        this.keyboardInput?.setVirtualDown(normalizedY <= this.downThreshold);
+        if (this.keyboardInput && isValid(this.keyboardInput)) {
+            this.keyboardInput.setVirtualHorizontal(horizontal);
+            this.keyboardInput.setVirtualDown(normalizedY <= this.downThreshold);
+        }
     }
 
     private readonly resetJoystick = (): void => {
         this.activeTouchId = null;
-        this.joystickHandle?.setPosition(0, 0, 0);
-        this.keyboardInput?.setVirtualHorizontal(0);
-        this.keyboardInput?.setVirtualDown(false);
+        if (this.joystickHandle && isValid(this.joystickHandle)) {
+            this.joystickHandle.setPosition(0, 0, 0);
+        }
+        if (this.keyboardInput && isValid(this.keyboardInput)) {
+            this.keyboardInput.setVirtualHorizontal(0);
+            this.keyboardInput.setVirtualDown(false);
+        }
     };
 
     private removeListeners(): void {
-        this.node.off(Node.EventType.TOUCH_START, this.onTouchStart, this);
-        this.node.off(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
-        this.node.off(Node.EventType.TOUCH_END, this.onTouchEnd, this);
-        this.node.off(Node.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
+        if (!this.listening) {
+            return;
+        }
+
+        if (isValid(this.node)) {
+            this.node.off(Node.EventType.TOUCH_START, this.onTouchStart, this);
+            this.node.off(Node.EventType.TOUCH_MOVE, this.onTouchMove, this);
+            this.node.off(Node.EventType.TOUCH_END, this.onTouchEnd, this);
+            this.node.off(Node.EventType.TOUCH_CANCEL, this.onTouchCancel, this);
+        }
         game.off(Game.EVENT_HIDE, this.resetJoystick, this);
+        this.listening = false;
     }
 }
