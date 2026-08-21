@@ -14,6 +14,15 @@ export interface KnockbackEvent {
     readonly force: Readonly<Vec2>;
 }
 
+/** Data emitted whenever the current health value actually changes. */
+export interface HealthChangedEvent {
+    readonly previousHealth: number;
+    readonly currentHealth: number;
+    readonly maxHealth: number;
+    readonly delta: number;
+    readonly isDead: boolean;
+}
+
 /** Shared health and combat notifications for players and enemies. */
 @ccclass('Damageable')
 export class Damageable extends Component {
@@ -21,6 +30,7 @@ export class Damageable extends Component {
     public static readonly EVENT_DIED = 'died';
     public static readonly EVENT_KNOCKBACK = 'knockback';
     public static readonly EVENT_RESET = 'reset';
+    public static readonly EVENT_HEALTH_CHANGED = 'health-changed';
 
     @property({ min: 1, tooltip: 'Maximum and initial health.' })
     public maxHealth = 100;
@@ -70,7 +80,10 @@ export class Damageable extends Component {
 
         if (this.health === 0 && !this.dead) {
             this.dead = true;
+            this.emitHealthChanged(previousHealth);
             this.combatEvents.emit(Damageable.EVENT_DIED, this);
+        } else {
+            this.emitHealthChanged(previousHealth);
         }
         return true;
     }
@@ -83,14 +96,22 @@ export class Damageable extends Component {
 
         const previousHealth = this.health;
         this.health = Math.min(this.getValidMaxHealth(), this.health + amount);
-        return this.health - previousHealth;
+        const restoredHealth = this.health - previousHealth;
+        if (restoredHealth > 0) {
+            this.emitHealthChanged(previousHealth);
+        }
+        return restoredHealth;
     }
 
     /** Revives this component and restores it to its configured maximum health. */
     public resetHealth(): void {
+        const previousHealth = this.health;
         this.maxHealth = this.getValidMaxHealth();
         this.health = this.maxHealth;
         this.dead = false;
+        if (this.health !== previousHealth) {
+            this.emitHealthChanged(previousHealth);
+        }
         this.combatEvents.emit(Damageable.EVENT_RESET, this);
     }
 
@@ -100,5 +121,16 @@ export class Damageable extends Component {
 
     private getValidMaxHealth(): number {
         return Number.isFinite(this.maxHealth) ? Math.max(1, this.maxHealth) : 1;
+    }
+
+    private emitHealthChanged(previousHealth: number): void {
+        const event: HealthChangedEvent = {
+            previousHealth,
+            currentHealth: this.health,
+            maxHealth: this.getValidMaxHealth(),
+            delta: this.health - previousHealth,
+            isDead: this.dead,
+        };
+        this.combatEvents.emit(Damageable.EVENT_HEALTH_CHANGED, event);
     }
 }
