@@ -36,7 +36,8 @@ export class Hitbox extends Component {
 
     private collider: Collider2D | null = null;
     private activeAttackId = 0;
-    private readonly hitTargets = new Set<Hurtbox>();
+    // Cocos may clear component fields while nodes are being torn down.
+    private hitTargets: Set<Hurtbox> | null = new Set<Hurtbox>();
 
     public get attackId(): number {
         return this.activeAttackId;
@@ -60,6 +61,9 @@ export class Hitbox extends Component {
 
     /** Starts a new attack window and returns its process-unique ID. */
     public beginAttack(): number {
+        if (!this.isValid) {
+            return 0;
+        }
         this.endAttack();
         this.activeAttackId = nextAttackId;
         nextAttackId += 1;
@@ -67,7 +71,12 @@ export class Hitbox extends Component {
         if (collider) {
             collider.enabled = true;
             const attackId = this.activeAttackId;
-            director.once(Director.EVENT_AFTER_PHYSICS, () => this.queryOverlaps(attackId), this);
+            director.once(Director.EVENT_AFTER_PHYSICS, () => {
+                if (!this.isValid || !this.collider?.isValid) {
+                    return;
+                }
+                this.queryOverlaps(attackId);
+            }, this);
         }
         return this.activeAttackId;
     }
@@ -75,9 +84,10 @@ export class Hitbox extends Component {
     /** Closes the active window. Contacts outside a window never deal damage. */
     public endAttack(): void {
         this.activeAttackId = 0;
-        this.hitTargets.clear();
-        if (this.collider?.isValid) {
-            this.collider.enabled = false;
+        this.hitTargets?.clear();
+        const collider = this.collider;
+        if (collider?.isValid) {
+            collider.enabled = false;
         }
     }
 
@@ -87,14 +97,15 @@ export class Hitbox extends Component {
     }
 
     protected onDisable(): void {
-        this.collider?.off(Contact2DType.BEGIN_CONTACT, this.onBeginContact, this);
+        this.removeContactListener();
         this.endAttack();
     }
 
     protected onDestroy(): void {
-        this.collider?.off(Contact2DType.BEGIN_CONTACT, this.onBeginContact, this);
+        this.removeContactListener();
         this.endAttack();
         this.collider = null;
+        this.hitTargets = null;
     }
 
     private onBeginContact(
@@ -111,9 +122,20 @@ export class Hitbox extends Component {
 
     private getCollider(): Collider2D | null {
         if (!this.collider?.isValid) {
+            if (!this.isValid || !this.node?.isValid) {
+                this.collider = null;
+                return null;
+            }
             this.collider = this.getComponent(Collider2D);
         }
-        return this.collider;
+        return this.collider?.isValid ? this.collider : null;
+    }
+
+    private removeContactListener(): void {
+        const collider = this.collider;
+        if (collider?.isValid) {
+            collider.off(Contact2DType.BEGIN_CONTACT, this.onBeginContact, this);
+        }
     }
 
     private findHurtbox(node: Node): Hurtbox | null {
@@ -130,8 +152,14 @@ export class Hitbox extends Component {
 
     /** Catches colliders which were already overlapping when this attack was enabled. */
     private queryOverlaps(attackId: number): void {
+        if (!this.isValid) {
+            return;
+        }
         const collider = this.getCollider();
-        if (attackId !== this.activeAttackId || !this.enabledInHierarchy || !collider?.enabled) {
+        if (attackId !== this.activeAttackId
+            || !this.enabledInHierarchy
+            || !collider?.isValid
+            || !collider.enabled) {
             return;
         }
 
@@ -151,12 +179,13 @@ export class Hitbox extends Component {
         }
 
         const hurtbox = this.findHurtbox(otherCollider.node);
-        if (!hurtbox || this.hitTargets.has(hurtbox)) {
+        const hitTargets = this.hitTargets;
+        if (!hurtbox || !hitTargets || hitTargets.has(hurtbox)) {
             return;
         }
 
         // Reserve before dispatch so contacts and the overlap query cannot hit it twice.
-        this.hitTargets.add(hurtbox);
+        hitTargets.add(hurtbox);
         console.log(`[Hitbox] Hit target: ${hurtbox.node.name}`);
         hurtbox.receiveHit(this, attackId);
     }

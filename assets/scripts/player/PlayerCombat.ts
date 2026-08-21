@@ -65,12 +65,16 @@ export class PlayerCombat extends Component {
     }
 
     private startAttack(): void {
-        this.hitbox?.beginAttack();
+        const hitbox = this.getValidHitbox();
+        if (!hitbox) {
+            return;
+        }
+        hitbox.beginAttack();
         log('[PlayerCombat] Attack started');
         this.showHitboxSprite();
         this.activeTimeRemaining = Math.max(0, this.attackActiveDuration);
         if (this.activeTimeRemaining === 0) {
-            this.hitbox?.endAttack();
+            this.getValidHitbox()?.endAttack();
             this.hideHitboxSprite();
             this.recoveryTimeRemaining = Math.max(0, this.attackRecoveryDuration);
         }
@@ -81,7 +85,7 @@ export class PlayerCombat extends Component {
             const activeBefore = this.activeTimeRemaining;
             this.activeTimeRemaining = Math.max(0, activeBefore - dt);
             if (this.activeTimeRemaining === 0) {
-                this.hitbox?.endAttack();
+                this.getValidHitbox()?.endAttack();
                 this.hideHitboxSprite();
                 const overflow = Math.max(0, dt - activeBefore);
                 this.recoveryTimeRemaining = Math.max(0, this.attackRecoveryDuration - overflow);
@@ -93,13 +97,13 @@ export class PlayerCombat extends Component {
     }
 
     private validateReferences(): boolean {
-        if (this.keyboardInput && this.hitbox) {
+        if (this.keyboardInput?.isValid && this.getValidHitbox()) {
             return true;
         }
         if (!this.warnedMissingReferences) {
             const missing = [
-                !this.keyboardInput ? 'KeyboardInput' : '',
-                !this.hitbox ? 'Hitbox' : '',
+                !this.keyboardInput?.isValid ? 'KeyboardInput' : '',
+                !this.getValidHitbox() ? 'Hitbox' : '',
             ].filter(Boolean).join('、');
             warn(`[PlayerCombat] ${this.node.name} 缺少 Inspector 引用：${missing}，攻击输入将被安全忽略。`);
             this.warnedMissingReferences = true;
@@ -108,11 +112,15 @@ export class PlayerCombat extends Component {
     }
 
     private readonly resetAttack = (): void => {
-        this.hitbox?.endAttack();
+        this.getValidHitbox()?.endAttack();
         this.hideHitboxSprite();
         this.activeTimeRemaining = 0;
         this.recoveryTimeRemaining = 0;
     };
+
+    private getValidHitbox(): Hitbox | null {
+        return this.hitbox?.isValid ? this.hitbox : null;
+    }
 
     private showHitboxSprite(): void {
         if (!this.hitboxSprite?.isValid) {
