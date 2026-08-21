@@ -24,6 +24,7 @@
 2. 选中带有 `TouchControls` 组件的节点，把新节点拖入 **Attack Button**。该引用是可选的，未绑定不会报错。
 3. AttackButton 只在 `TOUCH_START` 产生一次攻击边缘；`TOUCH_END` 和 `TOUCH_CANCEL` 只结束这次触摸，不会补发攻击。
 4. 摇杆、JumpButton 和 AttackButton 使用各自节点的触摸事件，因此可用一根手指持续控制摇杆，同时用另一根手指攻击或跳跃。切后台、禁用或销毁 TouchControls 时会移除监听并清空虚拟输入。
+5. 键盘和触屏的攻击边缘独立保存和消费；同一帧同时按 J 和点击 AttackButton 时，一种输入不会清除另一种输入。紧接着消费的第二个边缘会因已进入攻击状态而直接忽略，不会变成连击缓存。
 
 ## 3. 键盘与触屏验收
 
