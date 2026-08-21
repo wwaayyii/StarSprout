@@ -1,4 +1,4 @@
-import { _decorator, Component, game, Game, Node } from 'cc';
+import { _decorator, Component, game, Game, isValid, Node } from 'cc';
 import { KeyboardInput } from './KeyboardInput';
 
 const { ccclass, property } = _decorator;
@@ -41,7 +41,7 @@ export class TouchControls extends Component {
     }
 
     private addListeners(): void {
-        if (this.listening) {
+        if (this.listening || !isValid(this) || !isValid(this.node)) {
             return;
         }
 
@@ -49,7 +49,9 @@ export class TouchControls extends Component {
         this.bindButton(this.rightButton, this.pressRight, this.releaseRight, this.releaseRight);
         this.bindButton(this.downButton, this.pressDown, this.releaseDown, this.releaseDown);
         this.bindButton(this.jumpButton, this.pressJump, this.releaseJump, this.cancelJump);
-        this.attackButton?.on(Node.EventType.TOUCH_START, this.pressAttack, this);
+        if (this.attackButton && isValid(this.attackButton)) {
+            this.attackButton.on(Node.EventType.TOUCH_START, this.pressAttack, this);
+        }
         game.on(Game.EVENT_HIDE, this.releaseVirtualInput, this);
         this.listening = true;
     }
@@ -63,7 +65,9 @@ export class TouchControls extends Component {
         this.unbindButton(this.rightButton, this.pressRight, this.releaseRight, this.releaseRight);
         this.unbindButton(this.downButton, this.pressDown, this.releaseDown, this.releaseDown);
         this.unbindButton(this.jumpButton, this.pressJump, this.releaseJump, this.cancelJump);
-        this.attackButton?.off(Node.EventType.TOUCH_START, this.pressAttack, this);
+        if (this.attackButton && isValid(this.attackButton)) {
+            this.attackButton.off(Node.EventType.TOUCH_START, this.pressAttack, this);
+        }
         game.off(Game.EVENT_HIDE, this.releaseVirtualInput, this);
         this.listening = false;
     }
@@ -74,7 +78,7 @@ export class TouchControls extends Component {
         release: () => void,
         cancel: () => void,
     ): void {
-        if (!node) {
+        if (!node || !isValid(node)) {
             return;
         }
         node.on(Node.EventType.TOUCH_START, press, this);
@@ -88,7 +92,7 @@ export class TouchControls extends Component {
         release: () => void,
         cancel: () => void,
     ): void {
-        if (!node) {
+        if (!node || !isValid(node)) {
             return;
         }
         node.off(Node.EventType.TOUCH_START, press, this);
@@ -96,18 +100,24 @@ export class TouchControls extends Component {
         node.off(Node.EventType.TOUCH_CANCEL, cancel, this);
     }
 
-    private readonly pressLeft = (): void => this.keyboardInput?.setVirtualLeft(true);
-    private readonly releaseLeft = (): void => this.keyboardInput?.setVirtualLeft(false);
-    private readonly pressRight = (): void => this.keyboardInput?.setVirtualRight(true);
-    private readonly releaseRight = (): void => this.keyboardInput?.setVirtualRight(false);
-    private readonly pressDown = (): void => this.keyboardInput?.setVirtualDown(true);
-    private readonly releaseDown = (): void => this.keyboardInput?.setVirtualDown(false);
-    private readonly pressJump = (): void => this.keyboardInput?.setVirtualJump(true);
-    private readonly releaseJump = (): void => this.keyboardInput?.setVirtualJump(false);
-    private readonly cancelJump = (): void => this.keyboardInput?.cancelVirtualJump();
-    private readonly pressAttack = (): void => this.keyboardInput?.pressVirtualAttack();
+    private readonly pressLeft = (): void => this.withKeyboardInput(input => input.setVirtualLeft(true));
+    private readonly releaseLeft = (): void => this.withKeyboardInput(input => input.setVirtualLeft(false));
+    private readonly pressRight = (): void => this.withKeyboardInput(input => input.setVirtualRight(true));
+    private readonly releaseRight = (): void => this.withKeyboardInput(input => input.setVirtualRight(false));
+    private readonly pressDown = (): void => this.withKeyboardInput(input => input.setVirtualDown(true));
+    private readonly releaseDown = (): void => this.withKeyboardInput(input => input.setVirtualDown(false));
+    private readonly pressJump = (): void => this.withKeyboardInput(input => input.setVirtualJump(true));
+    private readonly releaseJump = (): void => this.withKeyboardInput(input => input.setVirtualJump(false));
+    private readonly cancelJump = (): void => this.withKeyboardInput(input => input.cancelVirtualJump());
+    private readonly pressAttack = (): void => this.withKeyboardInput(input => input.pressVirtualAttack());
 
     private readonly releaseVirtualInput = (): void => {
-        this.keyboardInput?.clearVirtualInput();
+        this.withKeyboardInput(input => input.clearVirtualInput());
     };
+
+    private withKeyboardInput(action: (input: KeyboardInput) => void): void {
+        if (this.keyboardInput && isValid(this.keyboardInput)) {
+            action(this.keyboardInput);
+        }
+    }
 }

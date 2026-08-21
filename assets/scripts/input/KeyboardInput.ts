@@ -5,6 +5,7 @@ const { ccclass } = _decorator;
 /** Collects keyboard state for the local player. */
 @ccclass('KeyboardInput')
 export class KeyboardInput extends Component {
+    private listening = false;
     private readonly heldKeys = new Set<KeyCode>();
     private jumpHeld = false;
     private keyboardJumpPressed = false;
@@ -111,9 +112,14 @@ export class KeyboardInput extends Component {
     }
 
     protected onEnable(): void {
+        if (this.listening) {
+            return;
+        }
+
         input.on(Input.EventType.KEY_DOWN, this.onKeyDown, this);
         input.on(Input.EventType.KEY_UP, this.onKeyUp, this);
         game.on(Game.EVENT_HIDE, this.clearState, this);
+        this.listening = true;
     }
 
     protected onDisable(): void {
@@ -186,8 +192,13 @@ export class KeyboardInput extends Component {
     }
 
     private removeListeners(): void {
+        if (!this.listening) {
+            return;
+        }
+
         input.off(Input.EventType.KEY_DOWN, this.onKeyDown, this);
         input.off(Input.EventType.KEY_UP, this.onKeyUp, this);
         game.off(Game.EVENT_HIDE, this.clearState, this);
+        this.listening = false;
     }
 }
