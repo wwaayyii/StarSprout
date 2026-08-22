@@ -354,7 +354,7 @@ TestLevel
 
 ### 5.1 通用状态机约束
 
-每个状态实现 `enter / fixedUpdate / exit`；状态转换由控制器在固定更新边界提交，避免同帧递归切换。最高优先级通常为 `Dead > Hurt > Skill/Attack > Movement`。死亡是终态，除关卡重置外不可退出。
+每个状态实现 `enter / update(dt) / exit`；普通 `Component` 由 Creator 3.8.8 支持的 `update(dt)` 驱动，状态转换由控制器在当前更新边界提交，避免同帧递归切换。写入物理速度时使用 `dt` 计算加减速且保留物理系统拥有的速度分量。最高优先级通常为 `Dead > Hurt > Skill/Attack > Movement`。死亡是终态，除关卡重置外不可退出。
 
 ### 5.2 玩家状态机
 
