@@ -1,4 +1,4 @@
-import { _decorator, Color, Component, game, Game, log, Sprite, warn } from 'cc';
+import { _decorator, Color, Component, game, Game, log, Size, Sprite, UITransform, Vec2, warn } from 'cc';
 import { Hitbox } from '../combat/Hitbox';
 import { KeyboardInput } from '../input/KeyboardInput';
 
@@ -23,6 +23,24 @@ export class PlayerCombat extends Component {
 
     @property({ type: Sprite, tooltip: 'Optional debug sprite shown while the attack hitbox is active.' })
     public hitboxSprite: Sprite | null = null;
+
+    @property({ type: Vec2, tooltip: 'Attack1 攻击框相对 PlayerHitbox 节点的偏移。' })
+    public attack1Offset = new Vec2(45, 0);
+
+    @property({ type: Size, tooltip: 'Attack1 攻击框尺寸；运行时负数与异常值按 0 处理。' })
+    public attack1Size = new Size(60, 50);
+
+    @property({ type: Vec2, tooltip: 'Attack2 攻击框相对 PlayerHitbox 节点的偏移。' })
+    public attack2Offset = new Vec2(55, 5);
+
+    @property({ type: Size, tooltip: 'Attack2 攻击框尺寸；运行时负数与异常值按 0 处理。' })
+    public attack2Size = new Size(80, 55);
+
+    @property({ type: Vec2, tooltip: 'Attack3 攻击框相对 PlayerHitbox 节点的偏移。' })
+    public attack3Offset = new Vec2(70, 0);
+
+    @property({ type: Size, tooltip: 'Attack3 攻击框尺寸；运行时负数与异常值按 0 处理。' })
+    public attack3Size = new Size(110, 65);
 
     @property({ min: 0, tooltip: 'Seconds for which the Attack1 Hitbox stays active.' })
     public attackActiveDuration = 0.15;
@@ -145,6 +163,13 @@ export class PlayerCombat extends Component {
         this.phase = AttackPhase.Active;
         this.phaseTimeRemaining = this.getActiveDuration(step);
         hitbox.damage = this.getDamage(step);
+        const bounds = this.getAttackBounds(step);
+        if (!hitbox.setBoxBounds(bounds.offset, bounds.size)) {
+            warn(`[PlayerCombat] ${hitbox.node.name} 缺少 BoxCollider2D，攻击已安全取消。`);
+            this.resetAttack();
+            return;
+        }
+        this.syncHitboxSprite(bounds.offset, bounds.size);
         hitbox.beginAttack();
         this.showHitboxSprite();
         log(`[PlayerCombat] Attack${step} started`);
@@ -208,6 +233,24 @@ export class PlayerCombat extends Component {
         return Number.isFinite(value) ? Math.max(0, value) : 0;
     }
 
+    private getAttackBounds(step: number): { offset: Vec2; size: Size } {
+        const configuredOffset = step === 1
+            ? this.attack1Offset : step === 2 ? this.attack2Offset : this.attack3Offset;
+        const configuredSize = step === 1
+            ? this.attack1Size : step === 2 ? this.attack2Size : this.attack3Size;
+        return {
+            offset: new Vec2(this.finite(configuredOffset?.x), this.finite(configuredOffset?.y)),
+            size: new Size(
+                this.nonNegative(configuredSize?.width),
+                this.nonNegative(configuredSize?.height),
+            ),
+        };
+    }
+
+    private finite(value: number | undefined): number {
+        return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+    }
+
     private validateReferences(): boolean {
         if (this.getValidKeyboardInput() && this.getValidHitbox()) {
             return true;
@@ -253,7 +296,7 @@ export class PlayerCombat extends Component {
     }
 
     private getValidHitbox(): Hitbox | null {
-        return this.hitbox?.isValid ? this.hitbox : null;
+        return this.hitbox?.isValid && this.hitbox.enabledInHierarchy ? this.hitbox : null;
     }
 
     private showHitboxSprite(): void {
@@ -262,6 +305,20 @@ export class PlayerCombat extends Component {
         }
         this.hitboxSprite.color = new Color(255, 255, 0, 128);
         this.hitboxSprite.enabled = true;
+    }
+
+    private syncHitboxSprite(offset: Readonly<Vec2>, size: Readonly<Size>): void {
+        const sprite = this.hitboxSprite;
+        const hitbox = this.getValidHitbox();
+        if (!sprite?.isValid || !hitbox) {
+            return;
+        }
+        sprite.node.getComponent(UITransform)?.setContentSize(size.width, size.height);
+        // The documented setup uses a Sprite child so its local position can mirror the
+        // collider offset without moving the PlayerHitbox node itself.
+        if (sprite.node !== hitbox.node) {
+            sprite.node.setPosition(offset.x, offset.y, sprite.node.position.z);
+        }
     }
 
     private hideHitboxSprite(): void {
