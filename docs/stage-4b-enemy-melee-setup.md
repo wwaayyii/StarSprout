@@ -12,9 +12,9 @@
 ## EnemyDebug / EnemyHitbox 节点
 
 1. 在 **EnemyDebug 物理根节点**下新建 `EnemyHitbox`。它必须与 `Visual` 同级，绝不能放进会使用负 X 缩放的 `Visual`。
-2. 为 `EnemyHitbox` 添加 `BoxCollider2D`：勾选 **Sensor**，初始禁用；尺寸与偏移可先任意，运行时由 `EnemyCombat` 原子更新。
+2. `EnemyHitbox` 节点必须始终保持 **Active**，不要通过禁用整个节点控制攻击窗口。为它添加 `BoxCollider2D`：勾选 **Sensor**，Collider 初始禁用；尺寸与偏移可先任意，运行时由 `EnemyCombat` 原子更新，攻击窗口只由 `Hitbox.beginAttack()` / `endAttack()` 控制。
 3. 添加 `Hitbox`：**Team = Enemy**，Damage `10`，Horizontal Knockback `4`，Vertical Knockback `3`。Collider 监听由脚本管理。
-4. 可在 `EnemyHitbox` 上添加黄色/橙色半透明 `Sprite` 与 `UITransform`，初始隐藏。将 Sprite 拖给 `EnemyCombat/Hitbox Sprite`；脚本仅在 Active 显示，并同步偏移与尺寸。
+4. 可在 `EnemyHitbox` 同一节点添加黄色/橙色半透明 `Sprite` 与 `UITransform`，Sprite **组件**初始可禁用。将 Sprite 拖给 `EnemyCombat/Hitbox Sprite`；脚本仅切换 `Sprite.enabled`，绝不切换 `EnemyHitbox.active`。不要禁用整个 EnemyHitbox 节点；脚本会在 Active 显示 Sprite 并同步尺寸。
 5. 确认 `PlayerHurtbox/Hurtbox` 的 **Team = Player**，且 Damageable 指向 Player 的 `Damageable`。
 
 `Hitbox.beginAttack()` 每次生成新的 `attackId`；Hitbox 与 Hurtbox 两层去重保证同一 Active 窗口对 `PlayerHurtbox` 最多结算一次。
@@ -60,3 +60,5 @@ Windup 获取 `EnemyChaser.acquireMovementLock()` 返回的独立、幂等释放
 6. 分别禁用 `EnemyCombat`、禁用/销毁 EnemyDebug、切场景、隐藏游戏窗口、击杀敌人，确认 Hitbox 与 Sprite 立即关闭且恢复后无遗留移动锁。
 7. 将三段时长逐个设为 0 及全部设为 0，再以低帧率/大 dt 测试；不得出现一帧残留命中、死循环或跨阶段悬挂。最后恢复默认值。
 8. 在 30 FPS 与 60 FPS 各测试实体贴身、范围边界、平台边缘和玩家反复左右穿越，确认无日志刷屏、无高频抖动，且玩家三段连击、跳跃和平台下穿不受破坏。
+9. 将 Sprite、Hitbox、BoxCollider2D 放在同一个保持 Active 的 `EnemyHitbox` 节点，确认 Sprite 只在 Active 显示/隐藏，同时 Collider 正常命中并扣除玩家 HP；整个过程中节点自身不得变为 inactive。
+10. 分别在 Windup 禁用 `EnemyChaser`、Active 禁用 `Hitbox`、Recovery 禁用 `EnemyChaser`，确认当前攻击立即取消、Collider/Sprite 关闭且移动锁释放；重新启用相应组件后，敌人应能重新追逐并开始新的攻击。

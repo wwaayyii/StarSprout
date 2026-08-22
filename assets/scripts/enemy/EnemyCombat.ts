@@ -77,7 +77,7 @@ export class EnemyCombat extends Component {
         this.currentPhase = EnemyAttackPhase.Active;
         this.phaseRemaining = this.nonNegative(this.activeDuration);
         hitbox.beginAttack();
-        if (this.hitboxSprite?.isValid) this.hitboxSprite.node.active = true;
+        if (this.hitboxSprite?.isValid) this.hitboxSprite.enabled = true;
         return true;
     }
 
@@ -88,7 +88,14 @@ export class EnemyCombat extends Component {
             remaining = Math.max(0, remaining - this.phaseRemaining);
             this.phaseRemaining = 0;
             if (this.currentPhase === EnemyAttackPhase.Windup) {
-                if (!this.enemyChaser?.canAttack || !this.beginActive()) return;
+                if (!this.enemyChaser?.canAttack) {
+                    // Hit-stun is operational but interrupts this swing. Invalid, disabled,
+                    // or dead dependencies must remain DisabledDead until they recover.
+                    if (this.isOperational()) this.cancelAttack();
+                    else this.disableCombat();
+                    return;
+                }
+                if (!this.beginActive()) return;
             } else if (this.currentPhase === EnemyAttackPhase.Active) {
                 this.closeHitbox();
                 this.currentPhase = EnemyAttackPhase.Recovery;
@@ -116,8 +123,11 @@ export class EnemyCombat extends Component {
     }
 
     private isOperational(): boolean {
-        return Boolean(this.node?.isValid && this.target?.isValid && this.enemyChaser?.isValid
-            && this.hitbox?.isValid && this.listeningTo?.isValid && !this.listeningTo!.isDead
+        return Boolean(this.node?.isValid && this.enabledInHierarchy
+            && this.target?.isValid && this.target.activeInHierarchy
+            && this.enemyChaser?.isValid && this.enemyChaser.enabledInHierarchy
+            && this.hitbox?.isValid && this.hitbox.enabledInHierarchy
+            && this.listeningTo?.isValid && !this.listeningTo!.isDead
             && this.getTargetDamageable()?.isValid && !this.getTargetDamageable()!.isDead);
     }
     private isAttackingPhase(): boolean { return this.currentPhase >= EnemyAttackPhase.Windup && this.currentPhase <= EnemyAttackPhase.Recovery; }
@@ -148,12 +158,16 @@ export class EnemyCombat extends Component {
     private cleanup(): void { game.off(Game.EVENT_HIDE, this.cancelAttack, this); this.unlisten(); this.disableCombat(); }
     private closeHitbox(): void { this.hitbox?.endAttack(); this.hideSprite(); }
     private releaseMovement(): void { this.movementLock?.release(); this.movementLock = null; }
-    private hideSprite(): void { if (this.hitboxSprite?.isValid) this.hitboxSprite.node.active = false; }
+    private hideSprite(): void { if (this.hitboxSprite?.isValid) this.hitboxSprite.enabled = false; }
     private syncSprite(offset: Vec2, size: Size): void {
         const sprite = this.hitboxSprite;
         if (!sprite?.isValid) return;
-        sprite.node.setPosition(offset.x, offset.y, sprite.node.position.z);
         sprite.getComponent(UITransform)?.setContentSize(size);
+        // The recommended setup shares EnemyHitbox with Hitbox/Collider. Never move that
+        // node to visualize the collider offset or the collider would receive it twice.
+        if (sprite.node !== this.hitbox?.node) {
+            sprite.node.setPosition(offset.x, offset.y, sprite.node.position.z);
+        }
     }
     private finite(value: number | undefined): number { return Number.isFinite(value) ? value! : 0; }
     private nonNegative(value: number | undefined): number { return Number.isFinite(value) ? Math.max(0, value!) : 0; }
