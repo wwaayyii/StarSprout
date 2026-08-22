@@ -474,7 +474,7 @@
     "_prefab": null,
     "_lpos": {
       "__type__": "cc.Vec3",
-      "x": 45,
+      "x": 0,
       "y": 0,
       "z": 0
     },
@@ -1089,6 +1089,36 @@
     },
     "hitboxSprite": {
       "__id__": 13
+    },
+    "attack1Offset": {
+      "__type__": "cc.Vec2",
+      "x": 45,
+      "y": 0
+    },
+    "attack1Size": {
+      "__type__": "cc.Size",
+      "width": 60,
+      "height": 50
+    },
+    "attack2Offset": {
+      "__type__": "cc.Vec2",
+      "x": 55,
+      "y": 5
+    },
+    "attack2Size": {
+      "__type__": "cc.Size",
+      "width": 80,
+      "height": 55
+    },
+    "attack3Offset": {
+      "__type__": "cc.Vec2",
+      "x": 70,
+      "y": 0
+    },
+    "attack3Size": {
+      "__type__": "cc.Size",
+      "width": 110,
+      "height": 65
     },
     "attackActiveDuration": 0.15,
     "attackRecoveryDuration": 0.25,
