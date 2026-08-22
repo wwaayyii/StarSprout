@@ -80,6 +80,7 @@ export class EnemyChaser extends Component {
     private visualBaseScaleX = 1;
     private warnedInvalidVisualRoot = false;
     private warnedConfiguration = false;
+    private hasLoggedFirstChase = false;
 
     public get state(): EnemyChaserState {
         return this.currentState;
@@ -95,13 +96,15 @@ export class EnemyChaser extends Component {
         this.captureVisualScale();
         this.startListening();
         game.on(Game.EVENT_HIDE, this.onGameHide, this);
+        game.on(Game.EVENT_SHOW, this.onGameShow, this);
         this.hitStunRemaining = 0;
-        this.currentState = this.hasUsableReferences()
+        this.hasLoggedFirstChase = false;
+        this.setState(this.hasUsableReferences()
             ? EnemyChaserState.Idle
-            : EnemyChaserState.DisabledDead;
+            : EnemyChaserState.DisabledDead);
     }
 
-    protected fixedUpdate(deltaTime: number): void {
+    protected update(deltaTime: number): void {
         if (!this.hasUsableReferences()) {
             this.enterDisabledState();
             return;
@@ -124,16 +127,16 @@ export class EnemyChaser extends Component {
 
         let desiredSpeed = 0;
         if (distance > this.detectionRange) {
-            this.currentState = EnemyChaserState.Idle;
+            this.setState(EnemyChaserState.Idle);
         } else if (this.shouldStopForTarget(distance)) {
-            this.currentState = EnemyChaserState.Stopping;
+            this.setState(EnemyChaserState.Stopping);
         } else {
             const direction = Math.sign(deltaX);
             if (direction !== 0 && this.hasGroundAhead(direction) && !this.hasObstacleAhead(direction)) {
-                this.currentState = EnemyChaserState.Chase;
+                this.setState(EnemyChaserState.Chase);
                 desiredSpeed = direction * this.maxMoveSpeed;
             } else {
-                this.currentState = EnemyChaserState.Stopping;
+                this.setState(EnemyChaserState.Stopping);
             }
         }
 
@@ -146,6 +149,7 @@ export class EnemyChaser extends Component {
 
     protected onDisable(): void {
         game.off(Game.EVENT_HIDE, this.onGameHide, this);
+        game.off(Game.EVENT_SHOW, this.onGameShow, this);
         this.stopListening();
         this.hitStunRemaining = 0;
         this.currentState = EnemyChaserState.DisabledDead;
@@ -154,6 +158,7 @@ export class EnemyChaser extends Component {
 
     protected onDestroy(): void {
         game.off(Game.EVENT_HIDE, this.onGameHide, this);
+        game.off(Game.EVENT_SHOW, this.onGameShow, this);
         this.stopListening();
         this.hitStunRemaining = 0;
         this.currentState = EnemyChaserState.DisabledDead;
@@ -220,18 +225,39 @@ export class EnemyChaser extends Component {
 
     private readonly onReset = (): void => {
         this.hitStunRemaining = 0;
-        this.currentState = EnemyChaserState.Idle;
+        this.setState(EnemyChaserState.Idle);
     };
 
     private readonly onGameHide = (): void => {
         this.hitStunRemaining = 0;
-        this.currentState = EnemyChaserState.DisabledDead;
+        this.setState(EnemyChaserState.DisabledDead);
         this.stopHorizontally();
     };
 
+    private readonly onGameShow = (): void => {
+        this.resolveReferences();
+        this.hitStunRemaining = 0;
+        if (this.hasUsableReferences()
+            && !this.damageable!.isDead
+            && this.rigidBody!.type === ERigidBody2DType.Dynamic) {
+            this.setState(EnemyChaserState.Idle);
+        }
+    };
+
     private enterDisabledState(): void {
-        this.currentState = EnemyChaserState.DisabledDead;
+        this.setState(EnemyChaserState.DisabledDead);
         this.stopHorizontally();
+    }
+
+    private setState(nextState: EnemyChaserState): void {
+        if (this.currentState === nextState) {
+            return;
+        }
+        this.currentState = nextState;
+        if (nextState === EnemyChaserState.Chase && !this.hasLoggedFirstChase) {
+            this.hasLoggedFirstChase = true;
+            console.info('[EnemyChaser] Entered Chase.', this.node);
+        }
     }
 
     private stopHorizontally(): void {

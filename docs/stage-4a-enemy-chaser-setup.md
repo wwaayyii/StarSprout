@@ -1,6 +1,6 @@
 # 阶段 4A：基础敌人追逐 AI 配置与验收
 
-本阶段新增 `EnemyChaser`，只负责地面水平追逐、停距、边缘与障碍检测；不包含攻击、跳跃、跨平台寻路或巡逻。脚本使用 `fixedUpdate` 和 `RigidBody2D.linearVelocity`，不会逐帧改位置，也不会覆盖垂直速度。
+本阶段新增 `EnemyChaser`，只负责地面水平追逐、停距、边缘与障碍检测；不包含攻击、跳跃、跨平台寻路或巡逻。Cocos Creator 3.8.8 的普通 `Component` 不会调度 `fixedUpdate`，所以脚本使用受支持的 `update(dt)` 驱动 AI，并通过 `RigidBody2D.linearVelocity` 移动；不会直接改位置，也不会覆盖垂直速度。加减速量按 `rate * dt` 计算，使 30/60 FPS 下的表现尽量一致。
 
 > 按任务约束，本提交不修改 `TestLevel.scene` 或任何 `.meta`。首次用 Creator 打开项目后由编辑器导入脚本，再按下文手工挂载并保存到你自己的后续场景配置提交。
 
@@ -38,6 +38,8 @@
 - **Stopping**：进入 Stop Distance，或边缘/障碍阻止前进时减速。离开该状态需要超过 `Stop Distance + Stop Hysteresis`，避免玩家跨越左右或停距边界时高频抖动。
 - **DisabledDead**：死亡、引用失效、组件禁用或游戏隐藏时停止水平速度并停止追踪。
 - `Damageable.EVENT_KNOCKBACK` 到达时进入默认 `0.18s` movement lock。锁定期间 AI 完全不写 `linearVelocity`，因此 `EnemyHitReaction` 写入的水平和垂直击退不会在下一物理帧被覆盖。死亡事件立即停止 AI；原有 `EnemyHitReaction` 仍负责 Hurtbox、闪烁、刚体禁用和延迟隐藏。
+- 可在运行时只读查看 `EnemyChaser.state`。组件第一次进入 **Chase** 时会输出一条 `[EnemyChaser] Entered Chase.` 日志；之后状态不变或再次进入 Chase 都不会逐帧刷屏。
+- 应用隐藏时会暂时进入 **DisabledDead**；收到 `Game.EVENT_SHOW` 后，引用有效、仍存活且刚体仍为 Dynamic 的敌人恢复到 **Idle**，下一次 `update(dt)` 可按距离进入 Chase。真正死亡的敌人不会因此复活。
 
 ## 手工验收步骤
 
@@ -48,4 +50,5 @@
 5. 在前方放置实体墙，再让玩家站在墙后：敌人停止且不持续顶墙抖动。确认 Hurtbox/Hitbox Sensor 不会让它误停。
 6. 观察跳起、下落与落地全过程：AI 只改水平速度，垂直速度与重力正常；敌人不穿过 Ground、平台或 Player。
 7. 用三段攻击从左右方向命中敌人：每次击退后的 0.18 秒内水平击退得到保留，血量、闪烁和生命文本照常更新。
-8. 打空生命：敌人立即停止追逐，Hurtbox/刚体按既有死亡流程关闭并延迟隐藏。重新激活/重置、切场景、禁用组件以及应用隐藏后，无失效引用访问或残留水平移动。
+8. 打空生命：敌人立即停止追逐，Hurtbox/刚体按既有死亡流程关闭并延迟隐藏。重新激活/重置、切场景、禁用组件后，无失效引用访问或残留水平移动。
+9. 在敌人存活且可追逐时让应用失去焦点/进入后台，再恢复运行：隐藏时状态为 DisabledDead 且水平停止；恢复后状态先回到 Idle，并能再次进入 Chase。确认控制台只在首次 Chase 时出现一条验证日志，静止或持续追逐时不刷屏。
