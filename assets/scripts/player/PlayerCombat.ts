@@ -99,10 +99,9 @@ export class PlayerCombat extends Component {
         const attackPressed = keyboard?.consumeAttackPressed() ?? false;
         const startedThisFrame = attackPressed && this.handleAttackPressed();
 
-        // Do not immediately spend dt on an attack that began from this frame's edge.
-        if (!startedThisFrame) {
-            this.advanceAttack(this.nonNegative(dt));
-        }
+        // A newly pressed attack keeps its full positive-duration first frame, but still
+        // normalizes zero-duration phases immediately so its Hitbox cannot linger a frame.
+        this.advanceAttack(startedThisFrame ? 0 : this.nonNegative(dt));
     }
 
     protected onDisable(): void {
