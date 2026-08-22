@@ -34,6 +34,13 @@ enum EnemyChaserReason {
     InvalidReferences = 'InvalidReferences',
     Dead = 'Dead',
     HitStun = 'HitStun',
+    MovementLocked = 'MovementLocked',
+}
+
+/** Idempotent ownership token. Releasing one system's lock never releases another's. */
+export interface EnemyMovementLock {
+    readonly released: boolean;
+    release(): void;
 }
 
 Enum(EnemyChaserState);
@@ -94,12 +101,44 @@ export class EnemyChaser extends Component {
     private warnedConfiguration = false;
     private currentReason = EnemyChaserReason.InvalidReferences;
     private groundGraceRemaining = 0;
+    private readonly movementLocks = new Set<symbol>();
 
     private static readonly GROUND_GRACE_SECONDS = 0.1;
     private static readonly GROUND_PROBE_LIFT = 4;
 
     public get state(): EnemyChaserState {
         return this.currentState;
+    }
+
+    /** Last valid visual facing; combat snapshots this instead of inferring direction. */
+    public get facing(): 1 | -1 {
+        return this.facingSign < 0 ? -1 : 1;
+    }
+
+    public get isHitStunned(): boolean {
+        return this.hitStunRemaining > 0;
+    }
+
+    /** True only while this controller and its Damageable can begin an attack. */
+    public get canAttack(): boolean {
+        return this.enabledInHierarchy && this.hasUsableReferences()
+            && !this.damageable!.isDead && !this.isHitStunned;
+    }
+
+    /** Acquires an independently owned chase-velocity lock with idempotent release. */
+    public acquireMovementLock(): EnemyMovementLock {
+        const token = Symbol('EnemyChaserMovementLock');
+        this.movementLocks.add(token);
+        this.stopHorizontally();
+        let released = false;
+        return {
+            get released(): boolean { return released; },
+            release: (): void => {
+                if (released) return;
+                released = true;
+                this.movementLocks.delete(token);
+            },
+        };
     }
 
     protected onLoad(): void {
@@ -142,6 +181,11 @@ export class EnemyChaser extends Component {
         if (this.hitStunRemaining > 0) {
             this.hitStunRemaining = Math.max(0, this.hitStunRemaining - dt);
             this.setState(EnemyChaserState.Stopping, EnemyChaserReason.HitStun);
+            return;
+        }
+
+        if (this.movementLocks.size > 0) {
+            this.setState(EnemyChaserState.Stopping, EnemyChaserReason.MovementLocked);
             return;
         }
 
@@ -188,6 +232,7 @@ export class EnemyChaser extends Component {
         game.off(Game.EVENT_SHOW, this.onGameShow, this);
         this.stopListening();
         this.hitStunRemaining = 0;
+        this.movementLocks.clear();
         this.currentState = EnemyChaserState.DisabledDead;
         this.stopHorizontally();
     }
@@ -197,6 +242,7 @@ export class EnemyChaser extends Component {
         game.off(Game.EVENT_SHOW, this.onGameShow, this);
         this.stopListening();
         this.hitStunRemaining = 0;
+        this.movementLocks.clear();
         this.currentState = EnemyChaserState.DisabledDead;
         this.rigidBody = null;
         this.damageable = null;
