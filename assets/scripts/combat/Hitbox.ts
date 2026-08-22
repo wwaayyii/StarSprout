@@ -76,6 +76,7 @@ export class Hitbox extends Component {
     protected onEnable(): void {
         const collider = this.getCollider();
         collider?.on(Contact2DType.BEGIN_CONTACT, this.onBeginContact, this);
+        director.on(Director.EVENT_AFTER_PHYSICS, this.onAfterPhysics, this);
         game.on(Game.EVENT_HIDE, this.endAttack, this);
     }
 
@@ -90,13 +91,6 @@ export class Hitbox extends Component {
         const collider = this.getCollider();
         if (collider) {
             collider.enabled = true;
-            const attackId = this.activeAttackId;
-            director.once(Director.EVENT_AFTER_PHYSICS, () => {
-                if (!this.isValid || !this.collider?.isValid) {
-                    return;
-                }
-                this.queryOverlaps(attackId);
-            }, this);
         }
         return this.activeAttackId;
     }
@@ -121,12 +115,14 @@ export class Hitbox extends Component {
 
     protected onDisable(): void {
         game.off(Game.EVENT_HIDE, this.endAttack, this);
+        director.off(Director.EVENT_AFTER_PHYSICS, this.onAfterPhysics, this);
         this.removeContactListener();
         this.endAttack();
     }
 
     protected onDestroy(): void {
         game.off(Game.EVENT_HIDE, this.endAttack, this);
+        director.off(Director.EVENT_AFTER_PHYSICS, this.onAfterPhysics, this);
         this.removeContactListener();
         this.endAttack();
         this.collider = null;
@@ -143,6 +139,17 @@ export class Hitbox extends Component {
         }
 
         this.tryHitCollider(otherCollider, this.activeAttackId);
+    }
+
+    /** Supplements BEGIN_CONTACT while an attack remains active across physics steps. */
+    private onAfterPhysics(): void {
+        // Avoid both collider lookup and the physics query while the attack window is closed.
+        // Reading the ID here also ensures a zero-length attack cannot leave a queued query.
+        if (!this.isAttacking) {
+            return;
+        }
+
+        this.queryOverlaps(this.activeAttackId);
     }
 
     private getCollider(): Collider2D | null {
