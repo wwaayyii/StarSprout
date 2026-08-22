@@ -1,14 +1,18 @@
 import {
     _decorator,
+    BoxCollider2D,
     Collider2D,
     Component,
     Contact2DType,
     director,
     Director,
     Enum,
+    game,
+    Game,
     IPhysics2DContact,
     Node,
     PhysicsSystem2D,
+    Size,
     Vec2,
 } from 'cc';
 import { Hurtbox } from './Hurtbox';
@@ -47,6 +51,21 @@ export class Hitbox extends Component {
         return this.activeAttackId !== 0;
     }
 
+    /** Updates a box attack volume while it is closed. Invalid values become safe zeroes. */
+    public setBoxBounds(offset: Readonly<Vec2>, size: Readonly<Size>): boolean {
+        // Never reshape an active collider: callers must configure a complete attack before
+        // beginAttack() so physics cannot observe half-updated bounds.
+        this.endAttack();
+        const collider = this.getCollider();
+        if (!(collider instanceof BoxCollider2D)) {
+            return false;
+        }
+
+        collider.offset = new Vec2(this.finite(offset.x), this.finite(offset.y));
+        collider.size = new Size(this.nonNegativeFinite(size.width), this.nonNegativeFinite(size.height));
+        return true;
+    }
+
     protected onLoad(): void {
         this.collider = this.getComponent(Collider2D);
         if (this.collider) {
@@ -57,6 +76,7 @@ export class Hitbox extends Component {
     protected onEnable(): void {
         const collider = this.getCollider();
         collider?.on(Contact2DType.BEGIN_CONTACT, this.onBeginContact, this);
+        game.on(Game.EVENT_HIDE, this.endAttack, this);
     }
 
     /** Starts a new attack window and returns its process-unique ID. */
@@ -97,11 +117,13 @@ export class Hitbox extends Component {
     }
 
     protected onDisable(): void {
+        game.off(Game.EVENT_HIDE, this.endAttack, this);
         this.removeContactListener();
         this.endAttack();
     }
 
     protected onDestroy(): void {
+        game.off(Game.EVENT_HIDE, this.endAttack, this);
         this.removeContactListener();
         this.endAttack();
         this.collider = null;
@@ -136,6 +158,14 @@ export class Hitbox extends Component {
         if (collider?.isValid) {
             collider.off(Contact2DType.BEGIN_CONTACT, this.onBeginContact, this);
         }
+    }
+
+    private finite(value: number): number {
+        return Number.isFinite(value) ? value : 0;
+    }
+
+    private nonNegativeFinite(value: number): number {
+        return Number.isFinite(value) ? Math.max(0, value) : 0;
     }
 
     private findHurtbox(node: Node): Hurtbox | null {
