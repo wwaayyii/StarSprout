@@ -24,6 +24,18 @@ export enum EnemyChaserState {
     DisabledDead,
 }
 
+/** Why the controller is not currently applying chase velocity. */
+enum EnemyChaserReason {
+    None = 'None',
+    TooFar = 'TooFar',
+    WithinStopDistance = 'WithinStopDistance',
+    NoGroundAhead = 'NoGroundAhead',
+    ObstacleAhead = 'ObstacleAhead',
+    InvalidReferences = 'InvalidReferences',
+    Dead = 'Dead',
+    HitStun = 'HitStun',
+}
+
 Enum(EnemyChaserState);
 
 /** Basic, ground-bound pursuit AI. It deliberately has no attack or path finding. */
@@ -51,10 +63,10 @@ export class EnemyChaser extends Component {
     @property({ min: 0, tooltip: 'Horizontal distance from the body edge used for the ground probe.' })
     public edgeCheckDistance = 45;
 
-    @property({ min: 0, tooltip: 'Downward length of the ground probe, in pixels.' })
+    @property({ min: 0, tooltip: 'Downward ground-probe length in pixels. Set to 0 to disable edge detection (ground is always considered safe).' })
     public edgeCheckDepth = 80;
 
-    @property({ min: 0, tooltip: 'Horizontal length of the obstacle probe, in pixels.' })
+    @property({ min: 0, tooltip: 'Horizontal obstacle-probe length in pixels. Set to 0 to disable obstacle detection (no raycast is made).' })
     public obstacleCheckDistance = 35;
 
     @property({ min: 0, tooltip: 'Extra distance required to leave Stopping, preventing boundary jitter.' })
@@ -80,7 +92,11 @@ export class EnemyChaser extends Component {
     private visualBaseScaleX = 1;
     private warnedInvalidVisualRoot = false;
     private warnedConfiguration = false;
-    private hasLoggedFirstChase = false;
+    private currentReason = EnemyChaserReason.InvalidReferences;
+    private groundGraceRemaining = 0;
+
+    private static readonly GROUND_GRACE_SECONDS = 0.1;
+    private static readonly GROUND_PROBE_LIFT = 4;
 
     public get state(): EnemyChaserState {
         return this.currentState;
@@ -98,53 +114,73 @@ export class EnemyChaser extends Component {
         game.on(Game.EVENT_HIDE, this.onGameHide, this);
         game.on(Game.EVENT_SHOW, this.onGameShow, this);
         this.hitStunRemaining = 0;
-        this.hasLoggedFirstChase = false;
-        this.setState(this.hasUsableReferences()
-            ? EnemyChaserState.Idle
-            : EnemyChaserState.DisabledDead);
+        this.groundGraceRemaining = 0;
+        if (this.hasUsableReferences()) {
+            this.setState(EnemyChaserState.Idle);
+        } else {
+            this.setState(EnemyChaserState.DisabledDead, EnemyChaserReason.InvalidReferences);
+        }
     }
 
     protected update(deltaTime: number): void {
         if (!this.hasUsableReferences()) {
-            this.enterDisabledState();
+            this.enterDisabledState(EnemyChaserReason.InvalidReferences);
             return;
         }
 
         const body = this.rigidBody!;
-        if (this.damageable!.isDead || body.type !== ERigidBody2DType.Dynamic) {
-            this.enterDisabledState();
+        if (this.damageable!.isDead) {
+            this.enterDisabledState(EnemyChaserReason.Dead);
+            return;
+        }
+        if (body.type !== ERigidBody2DType.Dynamic) {
+            this.enterDisabledState(EnemyChaserReason.InvalidReferences);
             return;
         }
 
+        const dt = this.nonNegativeFinite(deltaTime);
         if (this.hitStunRemaining > 0) {
-            this.hitStunRemaining = Math.max(0, this.hitStunRemaining - Math.max(0, deltaTime));
+            this.hitStunRemaining = Math.max(0, this.hitStunRemaining - dt);
+            this.setState(EnemyChaserState.Stopping, EnemyChaserReason.HitStun);
             return;
         }
 
         const deltaX = this.target!.worldPosition.x - this.node.worldPosition.x;
         const distance = Math.abs(deltaX);
+        if (!Number.isFinite(distance)) {
+            this.enterDisabledState(EnemyChaserReason.InvalidReferences);
+            return;
+        }
         this.updateFacing(deltaX);
 
         let desiredSpeed = 0;
-        if (distance > this.detectionRange) {
-            this.setState(EnemyChaserState.Idle);
+        if (distance > this.nonNegativeFinite(this.detectionRange)) {
+            this.setState(EnemyChaserState.Idle, EnemyChaserReason.TooFar);
         } else if (this.shouldStopForTarget(distance)) {
-            this.setState(EnemyChaserState.Stopping);
+            this.setState(EnemyChaserState.Stopping, EnemyChaserReason.WithinStopDistance);
         } else {
             const direction = Math.sign(deltaX);
-            if (direction !== 0 && this.hasGroundAhead(direction) && !this.hasObstacleAhead(direction)) {
-                this.setState(EnemyChaserState.Chase);
-                desiredSpeed = direction * this.maxMoveSpeed;
+            const hasGround = direction !== 0 && this.hasGroundAhead(direction, dt);
+            if (!hasGround) {
+                this.setState(EnemyChaserState.Stopping, EnemyChaserReason.NoGroundAhead);
+            } else if (this.hasObstacleAhead(direction)) {
+                this.setState(EnemyChaserState.Stopping, EnemyChaserReason.ObstacleAhead);
             } else {
-                this.setState(EnemyChaserState.Stopping);
+                this.setState(EnemyChaserState.Chase, EnemyChaserReason.None);
+                desiredSpeed = direction * this.nonNegativeFinite(this.maxMoveSpeed);
             }
         }
 
         const velocity = body.linearVelocity;
-        const rate = desiredSpeed === 0 ? this.deceleration : this.acceleration;
-        const nextX = this.moveTowards(velocity.x, desiredSpeed, Math.max(0, rate * deltaTime));
+        const currentX = Number.isFinite(velocity.x) ? velocity.x : 0;
+        const currentY = Number.isFinite(velocity.y) ? velocity.y : 0;
+        const rate = this.nonNegativeFinite(desiredSpeed === 0 ? this.deceleration : this.acceleration);
+        const nextX = this.moveTowards(currentX, desiredSpeed, rate * dt);
+        if (desiredSpeed !== 0 || nextX !== 0) {
+            body.wakeUp();
+        }
         // Preserve Y exactly: gravity, landing and knockback own vertical motion.
-        body.linearVelocity = new Vec2(nextX, velocity.y);
+        body.linearVelocity = new Vec2(nextX, currentY);
     }
 
     protected onDisable(): void {
@@ -213,14 +249,14 @@ export class EnemyChaser extends Component {
 
     private readonly onKnockback = (_event: KnockbackEvent): void => {
         if (!this.damageable?.isDead) {
-            this.hitStunRemaining = Math.max(0, this.hitStunDuration);
-            this.currentState = EnemyChaserState.Stopping;
+            this.hitStunRemaining = this.nonNegativeFinite(this.hitStunDuration);
+            this.setState(EnemyChaserState.Stopping, EnemyChaserReason.HitStun);
         }
     };
 
     private readonly onDied = (): void => {
         this.hitStunRemaining = 0;
-        this.enterDisabledState();
+        this.enterDisabledState(EnemyChaserReason.Dead);
     };
 
     private readonly onReset = (): void => {
@@ -244,19 +280,20 @@ export class EnemyChaser extends Component {
         }
     };
 
-    private enterDisabledState(): void {
-        this.setState(EnemyChaserState.DisabledDead);
+    private enterDisabledState(reason: EnemyChaserReason): void {
+        this.setState(EnemyChaserState.DisabledDead, reason);
         this.stopHorizontally();
     }
 
-    private setState(nextState: EnemyChaserState): void {
-        if (this.currentState === nextState) {
+    private setState(nextState: EnemyChaserState, reason = EnemyChaserReason.None): void {
+        if (this.currentState === nextState && this.currentReason === reason) {
             return;
         }
         this.currentState = nextState;
-        if (nextState === EnemyChaserState.Chase && !this.hasLoggedFirstChase) {
-            this.hasLoggedFirstChase = true;
-            console.info('[EnemyChaser] Entered Chase.', this.node);
+        this.currentReason = reason;
+        console.info(`[EnemyChaser] State=${EnemyChaserState[nextState]} Reason=${reason}`, this.node);
+        if (nextState === EnemyChaserState.Chase) {
+            this.rigidBody?.wakeUp();
         }
     }
 
@@ -271,28 +308,50 @@ export class EnemyChaser extends Component {
 
     private shouldStopForTarget(distance: number): boolean {
         const threshold = this.currentState === EnemyChaserState.Stopping
-            ? this.stopDistance + this.stopHysteresis
-            : this.stopDistance;
+            ? this.nonNegativeFinite(this.stopDistance) + this.nonNegativeFinite(this.stopHysteresis)
+            : this.nonNegativeFinite(this.stopDistance);
         return distance <= threshold;
     }
 
-    private hasGroundAhead(direction: number): boolean {
+    private hasGroundAhead(direction: number, dt: number): boolean {
+        const depth = this.nonNegativeFinite(this.edgeCheckDepth);
+        if (depth <= 0) {
+            this.groundGraceRemaining = 0;
+            return true;
+        }
         const collider = this.getBodyCollider();
         const physics = PhysicsSystem2D.instance;
         if (!collider?.isValid || !physics) {
             return false;
         }
         const bounds = collider.worldAABB;
-        const x = direction > 0
-            ? bounds.xMax + this.edgeCheckDistance
-            : bounds.xMin - this.edgeCheckDistance;
-        const start = new Vec2(x, bounds.yMin + 2);
-        const end = new Vec2(x, start.y - this.edgeCheckDepth);
-        return physics.raycast(start, end, ERaycast2DType.All)
-            .some((result) => this.isTerrainCollider(result.collider));
+        const distance = this.nonNegativeFinite(this.edgeCheckDistance);
+        const edgeX = direction > 0 ? bounds.xMax : bounds.xMin;
+        const width = Math.max(0, bounds.width);
+        // Probe both just inside the leading foot and ahead. Starting above the
+        // sole makes the ray cross the ground surface instead of beginning on it.
+        const footInset = Math.min(4, width * 0.2);
+        const probeXs = [edgeX - direction * footInset, edgeX + direction * distance];
+        const startY = bounds.yMin + EnemyChaser.GROUND_PROBE_LIFT;
+        const endY = bounds.yMin - depth;
+        const grounded = probeXs.some((x) => physics.raycast(
+            new Vec2(x, startY),
+            new Vec2(x, endY),
+            ERaycast2DType.All,
+        ).some((result) => this.isTerrainCollider(result.collider)));
+        if (grounded) {
+            this.groundGraceRemaining = EnemyChaser.GROUND_GRACE_SECONDS;
+            return true;
+        }
+        this.groundGraceRemaining = Math.max(0, this.groundGraceRemaining - dt);
+        return this.groundGraceRemaining > 0;
     }
 
     private hasObstacleAhead(direction: number): boolean {
+        const distance = this.nonNegativeFinite(this.obstacleCheckDistance);
+        if (distance <= 0) {
+            return false;
+        }
         const collider = this.getBodyCollider();
         const physics = PhysicsSystem2D.instance;
         if (!collider?.isValid || !physics) {
@@ -300,7 +359,7 @@ export class EnemyChaser extends Component {
         }
         const bounds = collider.worldAABB;
         const startX = direction > 0 ? bounds.xMax + 1 : bounds.xMin - 1;
-        const endX = startX + direction * this.obstacleCheckDistance;
+        const endX = startX + direction * distance;
         const y = (bounds.yMin + bounds.yMax) * 0.5;
         return physics.raycast(new Vec2(startX, y), new Vec2(endX, y), ERaycast2DType.All)
             .some((result) => this.isBlockingCollider(result.collider));
@@ -371,5 +430,9 @@ export class EnemyChaser extends Component {
         return Math.abs(target - current) <= maxDelta
             ? target
             : current + Math.sign(target - current) * maxDelta;
+    }
+
+    private nonNegativeFinite(value: number): number {
+        return Number.isFinite(value) ? Math.max(0, value) : 0;
     }
 }
