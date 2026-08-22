@@ -1,6 +1,7 @@
 import { _decorator, Color, Component, game, Game, log, Size, Sprite, UITransform, Vec2, warn } from 'cc';
 import { Hitbox } from '../combat/Hitbox';
 import { KeyboardInput } from '../input/KeyboardInput';
+import { PlayerMotor } from './PlayerMotor';
 
 const { ccclass, property } = _decorator;
 
@@ -17,6 +18,9 @@ const MAX_PHASE_TRANSITIONS_PER_FRAME = 8;
 export class PlayerCombat extends Component {
     @property(KeyboardInput)
     public keyboardInput: KeyboardInput | null = null;
+
+    @property({ type: PlayerMotor, tooltip: '提供最后一次有效水平移动朝向的 PlayerMotor。' })
+    public playerMotor: PlayerMotor | null = null;
 
     @property(Hitbox)
     public hitbox: Hitbox | null = null;
@@ -78,6 +82,7 @@ export class PlayerCombat extends Component {
     private currentRecoveryDuration = 0;
     private bufferedNextAttack = false;
     private warnedMissingReferences = false;
+    private attackFacing: 1 | -1 = 1;
 
     public get isAttacking(): boolean {
         return this.phase === AttackPhase.Active;
@@ -162,6 +167,9 @@ export class PlayerCombat extends Component {
         this.currentRecoveryDuration = this.getRecoveryDuration(step);
         this.phase = AttackPhase.Active;
         this.phaseTimeRemaining = this.getActiveDuration(step);
+        // Snapshot once per combo step. Movement may update PlayerMotor during the active
+        // window, but this attack volume must not jump to the other side mid-swing.
+        this.attackFacing = this.getValidPlayerMotor()?.facing ?? 1;
         hitbox.damage = this.getDamage(step);
         const bounds = this.getAttackBounds(step);
         if (!hitbox.setBoxBounds(bounds.offset, bounds.size)) {
@@ -239,7 +247,10 @@ export class PlayerCombat extends Component {
         const configuredSize = step === 1
             ? this.attack1Size : step === 2 ? this.attack2Size : this.attack3Size;
         return {
-            offset: new Vec2(this.finite(configuredOffset?.x), this.finite(configuredOffset?.y)),
+            offset: new Vec2(
+                Math.abs(this.finite(configuredOffset?.x)) * this.attackFacing,
+                this.finite(configuredOffset?.y),
+            ),
             size: new Size(
                 this.nonNegative(configuredSize?.width),
                 this.nonNegative(configuredSize?.height),
@@ -297,6 +308,12 @@ export class PlayerCombat extends Component {
 
     private getValidHitbox(): Hitbox | null {
         return this.hitbox?.isValid && this.hitbox.enabledInHierarchy ? this.hitbox : null;
+    }
+
+    private getValidPlayerMotor(): PlayerMotor | null {
+        return this.playerMotor?.isValid && this.playerMotor.enabledInHierarchy
+            ? this.playerMotor
+            : null;
     }
 
     private showHitboxSprite(): void {

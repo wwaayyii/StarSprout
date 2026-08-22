@@ -50,7 +50,7 @@ export class Hurtbox extends Component {
         // for every attack seen during a long session. Hitbox also guards its active attack,
         // so retaining the most recent IDs here provides cross-callback deduplication safely.
         this.rememberAttackId(attackId);
-        return target.takeDamage(hitbox.damage, hitbox.getKnockback());
+        return target.takeDamage(hitbox.damage, hitbox.getKnockback(this.node));
     }
 
     protected onDisable(): void {

@@ -32,7 +32,7 @@ export class Hitbox extends Component {
     @property({ min: 0, tooltip: 'Damage dealt to an accepted target.' })
     public damage = 10;
 
-    @property({ tooltip: 'Horizontal knockback. It follows this node world scale X.' })
+    @property({ tooltip: 'Horizontal knockback. Direction is chosen from attacker to target.' })
     public horizontalKnockback = 5;
 
     @property({ tooltip: 'Vertical knockback.' })
@@ -111,9 +111,12 @@ export class Hitbox extends Component {
         }
     }
 
-    public getKnockback(): Vec2 {
-        const facing = this.node.worldScale.x < 0 ? -1 : 1;
-        return new Vec2(this.horizontalKnockback * facing, this.verticalKnockback);
+    public getKnockback(target?: Readonly<Node> | null): Vec2 {
+        const deltaX = target?.isValid
+            ? target.worldPosition.x - this.node.worldPosition.x
+            : 0;
+        const direction = deltaX < 0 ? -1 : 1;
+        return new Vec2(Math.abs(this.horizontalKnockback) * direction, this.verticalKnockback);
     }
 
     protected onDisable(): void {

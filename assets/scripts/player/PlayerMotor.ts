@@ -46,6 +46,11 @@ export class PlayerMotor extends Component {
     private baseScaleX = 1;
     private dropThroughTimeRemaining = 0;
 
+    /** Last non-zero horizontal movement direction. Defaults to facing right. */
+    public get facing(): 1 | -1 {
+        return this.facingSign as 1 | -1;
+    }
+
     /** Whether one-way platforms should currently let this player pass downward. */
     public get isDroppingThroughPlatform(): boolean {
         return this.dropThroughTimeRemaining > 0;
@@ -55,7 +60,9 @@ export class PlayerMotor extends Component {
         this.body = this.getComponent(RigidBody2D);
         if (this.visualRoot) {
             this.baseScaleX = Math.abs(this.visualRoot.scale.x) || 1;
-            this.facingSign = this.visualRoot.scale.x < 0 ? -1 : 1;
+            // Facing is gameplay state rather than scene-authored scale. Always start right.
+            this.facingSign = 1;
+            this.applyVisualFacing();
         }
 
         if (this.body) {
@@ -97,13 +104,9 @@ export class PlayerMotor extends Component {
         this.body.linearVelocity = new Vec2(nextX, nextY);
 
         const horizontalSign = Math.sign(horizontal);
-        if (this.visualRoot && horizontalSign !== 0 && horizontalSign !== this.facingSign) {
+        if (horizontalSign !== 0 && horizontalSign !== this.facingSign) {
             this.facingSign = horizontalSign;
-            this.visualRoot.setScale(
-                this.baseScaleX * this.facingSign,
-                this.visualRoot.scale.y,
-                this.visualRoot.scale.z,
-            );
+            this.applyVisualFacing();
         }
     }
 
@@ -121,5 +124,16 @@ export class PlayerMotor extends Component {
         }
 
         return current + Math.sign(target - current) * maxDelta;
+    }
+
+    private applyVisualFacing(): void {
+        if (!this.visualRoot?.isValid) {
+            return;
+        }
+        this.visualRoot.setScale(
+            this.baseScaleX * this.facingSign,
+            this.visualRoot.scale.y,
+            this.visualRoot.scale.z,
+        );
     }
 }
